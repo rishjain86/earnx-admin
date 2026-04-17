@@ -138,9 +138,9 @@
             <i class="fa-solid fa-shield-halved"></i>
             <h2>Admin Portal</h2>
             <p style="color: var(--text-muted); margin-top: 10px; font-size: 0.9rem;">Authorized personnel only.</p>
-            <button class="btn-google" id="btn-login">
+            <button type="button" class="btn-google" id="btn-login">
                 <img src="https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg" alt="Google">
-                Sign in with Google
+                <span>Sign in with Google</span>
             </button>
         </div>
     </div>
@@ -255,9 +255,10 @@
     </div>
 
     <script type="module">
-        import { getAuth, GoogleAuthProvider, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.12.0/firebase-auth.js";
+        // Switched from signInWithRedirect to signInWithPopup for strict stability
+        import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.12.0/firebase-auth.js";
         import { initializeApp } from "https://www.gstatic.com/firebasejs/12.12.0/firebase-app.js";
-        import { getFirestore, collection, onSnapshot, doc, updateDoc, query, orderBy, getDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.12.0/firebase-firestore.js";
+        import { getFirestore, collection, onSnapshot, doc, updateDoc, query, orderBy, getDoc } from "https://www.gstatic.com/firebasejs/12.12.0/firebase-firestore.js";
 
         // 🔥 FIREBASE CONFIG
         const firebaseConfig = {
@@ -290,7 +291,6 @@
         const toastEl = document.getElementById('toast');
 
         // ==== AUTHENTICATION ====
-        // WAIT FOR DOM LOAD
         window.addEventListener("DOMContentLoaded", () => {
             const loginBtn = document.getElementById('btn-login');
 
@@ -299,10 +299,11 @@
                 return;
             }
 
+            // Fixed popup login logic
             loginBtn.addEventListener('click', async () => {
                 try {
                     const provider = new GoogleAuthProvider();
-                    await signInWithRedirect(auth, provider);
+                    await signInWithPopup(auth, provider);
                 } catch (e) {
                     console.error("Login Error:", e);
                     alert("Login failed: " + e.message);
@@ -312,37 +313,29 @@
 
         document.getElementById('btn-logout').addEventListener('click', async () => {
             await signOut(auth);
+            showToast("Logged out successfully");
         });
 
-        // HANDLE REDIRECT LOGIN PROPERLY
+        // Strict Auth Listener
         onAuthStateChanged(auth, async (user) => {
             if (user) {
-                if (user.email === ADMIN_EMAIL) {
+                if (user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
                     showAdminPanel();
                 } else {
-                    await signOut(auth);
                     alert("Access Denied: You are not authorized as Admin.");
+                    await signOut(auth);
+                    hideAdminPanel();
                 }
             } else {
                 hideAdminPanel();
             }
         });
 
-        // ENSURE REDIRECT RESULT IS CAPTURED
-        getRedirectResult(auth)
-          .then((result) => {
-            if (result?.user) {
-              console.log("Redirect Login Success:", result.user.email);
-            }
-          })
-          .catch((error) => {
-            console.error("Redirect Error:", error);
-          });
-
         function showAdminPanel() {
             loginScreen.style.display = 'none';
             adminScreen.style.display = 'flex';
             startListeners();
+            showToast("Welcome to Admin Dashboard!");
         }
 
         function hideAdminPanel() {
@@ -422,10 +415,9 @@
             );
 
             filtered.forEach(u => {
-                // DATE FIX APPLIED HERE
                 const date = u.createdAt?.seconds 
                     ? new Date(u.createdAt.seconds * 1000).toLocaleDateString() 
-                    : 'N/A';
+                    : (u.createdAt ? new Date(u.createdAt).toLocaleDateString() : 'N/A');
                     
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
@@ -451,10 +443,9 @@
             const filtered = withdrawalsData.filter(w => filter === 'all' || w.status === filter);
 
             filtered.forEach(w => {
-                // DATE FIX APPLIED HERE
                 const date = w.createdAt?.seconds 
                     ? new Date(w.createdAt.seconds * 1000).toLocaleString() 
-                    : 'N/A';
+                    : (w.createdAt ? new Date(w.createdAt).toLocaleString() : 'N/A');
                     
                 const statusBadge = `<span class="badge badge-${(w.status||'pending').toLowerCase()}">${w.status}</span>`;
                 
