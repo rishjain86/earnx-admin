@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>EarnX - Master Admin Panel</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -25,8 +25,8 @@
         body { font-family: 'Inter', sans-serif; background: var(--bg-darker); color: var(--text-light); overflow-x: hidden; }
         
         /* LOGIN SCREEN */
-        #login-screen { height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; background: var(--bg-dark); }
-        .login-box { background: var(--card-bg); padding: 40px; border-radius: 20px; border: 1px solid var(--card-border); text-align: center; width: 90%; max-width: 400px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        #login-screen { height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; background: var(--bg-dark); padding: 20px; }
+        .login-box { background: var(--card-bg); padding: 40px; border-radius: 20px; border: 1px solid var(--card-border); text-align: center; width: 100%; max-width: 400px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
         .login-box input { width: 100%; padding: 15px; margin: 10px 0; border-radius: 10px; background: var(--bg-darker); border: 1px solid var(--card-border); color: white; outline: none; }
         .login-box input:focus { border-color: var(--primary); }
         
@@ -47,14 +47,16 @@
         .stat-card h3 { color: var(--text-muted); font-size: 0.9rem; margin-bottom: 10px; text-transform: uppercase; }
         .stat-card .value { font-size: 2.5rem; font-weight: bold; }
         
-        /* TABS */
-        .tabs { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; border-bottom: 1px solid var(--card-border); padding-bottom: 10px; }
-        .tab { padding: 10px 20px; cursor: pointer; border-radius: 8px; font-weight: 600; color: var(--text-muted); transition: 0.2s; background: var(--bg-dark); border: 1px solid var(--card-border); }
+        /* TABS - Scrollable for Mobile */
+        .tabs { display: flex; flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; gap: 10px; margin-bottom: 20px; border-bottom: 1px solid var(--card-border); padding-bottom: 10px; }
+        .tabs::-webkit-scrollbar { height: 4px; }
+        .tabs::-webkit-scrollbar-thumb { background: var(--card-border); border-radius: 4px; }
+        .tab { flex: 0 0 auto; padding: 10px 20px; cursor: pointer; border-radius: 8px; font-weight: 600; color: var(--text-muted); transition: 0.2s; background: var(--bg-dark); border: 1px solid var(--card-border); white-space: nowrap; }
         .tab:hover { color: white; border-color: var(--text-muted); }
         .tab.active { background: rgba(16, 185, 129, 0.1); color: var(--primary); border: 1px solid var(--primary); }
 
-        /* TABLE */
-        .table-container { background: var(--card-bg); border-radius: 16px; border: 1px solid var(--card-border); overflow-x: auto; display: none; }
+        /* TABLE CONTAINER */
+        .table-container { background: var(--card-bg); border-radius: 16px; border: 1px solid var(--card-border); overflow: hidden; display: none; }
         .table-container.active { display: block; }
         table { width: 100%; border-collapse: collapse; text-align: left; }
         th, td { padding: 15px 20px; border-bottom: 1px solid var(--card-border); }
@@ -68,11 +70,10 @@
 
         .action-btns { display: flex; gap: 10px; }
 
-        /* USER MODAL */
+        /* MODAL */
         #user-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 10000; justify-content: center; align-items: center; padding: 20px; }
         .modal-content { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 16px; width: 100%; max-width: 600px; max-height: 85vh; overflow-y: auto; padding: 25px; box-shadow: 0 10px 40px rgba(0,0,0,0.6); position: relative; }
         .close-btn { position: absolute; top: 20px; right: 20px; font-size: 1.5rem; color: var(--text-muted); cursor: pointer; transition: 0.2s; }
-        .close-btn:hover { color: var(--danger); }
         
         .history-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--card-border); }
         .h-info { display: flex; flex-direction: column; }
@@ -83,7 +84,6 @@
         .text-danger { color: var(--danger); }
 
         #toast { position: fixed; bottom: 20px; right: 20px; background: var(--primary); color: white; padding: 15px 25px; border-radius: 8px; font-weight: bold; display: none; z-index: 99999; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
-        
         .loader { border: 4px solid var(--card-border); border-top: 4px solid var(--primary); border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: 20px auto; display: none; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
@@ -91,6 +91,32 @@
         .rank-1 { background: gold; color: black; border-color: gold; box-shadow: 0 0 10px gold; }
         .rank-2 { background: silver; color: black; border-color: silver; }
         .rank-3 { background: #cd7f32; color: white; border-color: #cd7f32; }
+
+        /* 🔥 RESPONSIVE MOBILE FIX (THE DHANSU PART) 🔥 */
+        @media screen and (max-width: 768px) {
+            .header { flex-direction: column; align-items: flex-start; gap: 15px; }
+            .header .btn { width: auto; align-self: flex-start; }
+            
+            .stats-grid { grid-template-columns: 1fr; gap: 15px; }
+            .stat-card { padding: 20px; }
+            .stat-card .value { font-size: 2.2rem; }
+
+            /* Table to Cards Conversion */
+            .table-container { background: transparent; border: none; }
+            table, thead, tbody, th, td, tr { display: block; width: 100%; }
+            thead tr { position: absolute; top: -9999px; left: -9999px; } /* Hide Table Head */
+            
+            tr { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; margin-bottom: 15px; overflow: hidden; }
+            
+            td { display: flex; justify-content: space-between; align-items: center; padding: 12px 15px; border-bottom: 1px dashed var(--card-border); text-align: right; font-size: 0.9rem; }
+            td:last-child { border-bottom: none; background: rgba(0,0,0,0.2); }
+            
+            /* Creating Pseudo-Labels for data */
+            td::before { content: attr(data-label); font-weight: 600; color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase; margin-right: 15px; text-align: left; }
+            
+            .action-btns { justify-content: flex-end; width: 100%; }
+            .modal-content { padding: 20px 15px; width: 95%; max-height: 90vh; }
+        }
     </style>
 </head>
 <body>
@@ -128,8 +154,8 @@
     <div id="admin-dashboard">
         <div class="header">
             <div>
-                <h1 style="color: var(--primary);"><i class="fa-solid fa-rocket"></i> EarnX Master Panel</h1>
-                <p style="font-size: 0.9rem;">Manage Withdrawals, Users & Leaderboard</p>
+                <h1 style="color: var(--primary);"><i class="fa-solid fa-rocket"></i> EarnX Master</h1>
+                <p style="font-size: 0.9rem;">Manage Withdrawals & Users</p>
             </div>
             <button class="btn btn-danger btn-small" onclick="adminLogout()"><i class="fa-solid fa-power-off"></i> Logout</button>
         </div>
@@ -150,11 +176,11 @@
         </div>
 
         <div class="tabs">
-            <div class="tab active" onclick="switchTab('withdraw-pending')" id="tab-withdraw-pending"><i class="fa-solid fa-hourglass-half"></i> Pending Withdrawals</div>
-            <div class="tab" onclick="switchTab('withdraw-history')" id="tab-withdraw-history"><i class="fa-solid fa-clock-rotate-left"></i> Withdrawal History</div>
+            <div class="tab active" onclick="switchTab('withdraw-pending')" id="tab-withdraw-pending"><i class="fa-solid fa-hourglass-half"></i> Pending</div>
+            <div class="tab" onclick="switchTab('withdraw-history')" id="tab-withdraw-history"><i class="fa-solid fa-clock-rotate-left"></i> History</div>
             <div class="tab" onclick="switchTab('users')" id="tab-users"><i class="fa-solid fa-users"></i> All Users</div>
             <div class="tab" onclick="switchTab('leaderboard')" id="tab-leaderboard"><i class="fa-solid fa-trophy"></i> Leaderboard</div>
-            <button class="btn btn-small" style="margin-left: auto; background: var(--bg-dark); border: 1px solid var(--card-border);" onclick="loadDashboardData()"><i class="fa-solid fa-rotate-right"></i> Refresh Data</button>
+            <button class="btn btn-small" style="margin-left: auto; background: var(--bg-dark); border: 1px solid var(--card-border);" onclick="loadDashboardData()"><i class="fa-solid fa-rotate-right"></i> Refresh</button>
         </div>
 
         <div class="loader" id="main-loader"></div>
@@ -337,7 +363,7 @@
         else if (currentTab === 'leaderboard') renderLeaderboard();
     }
 
-    // --- RENDER WITHDRAWALS ---
+    // --- RENDER WITHDRAWALS (DATA LABELS ADDED FOR MOBILE CSS) ---
     function renderWithdrawals() {
         const tbody = document.getElementById('tbody-withdrawals');
         tbody.innerHTML = '';
@@ -360,16 +386,16 @@
 
             const tr = document.createElement('tr');
             let html = `
-                <td style="font-size: 0.8rem; color: var(--text-muted);">${dateStr}</td>
-                <td style="font-size: 0.8rem;">${w.userId.substring(0,8)}...</td>
-                <td style="font-weight: bold; color: white;">${w.upiId}</td>
-                <td style="color: var(--primary); font-weight: bold;">₹${amountInRs} <br><span style="font-size:0.7rem; color:gray;">(${w.coins} Coins)</span></td>
-                <td><span class="badge ${badgeClass}">${w.status}</span></td>
+                <td data-label="Date & Time"><span style="font-size: 0.8rem; color: var(--text-muted);">${dateStr}</span></td>
+                <td data-label="User ID"><span style="font-size: 0.8rem;">${w.userId.substring(0,8)}...</span></td>
+                <td data-label="UPI ID"><span style="font-weight: bold; color: white;">${w.upiId}</span></td>
+                <td data-label="Amount"><span style="color: var(--primary); font-weight: bold;">₹${amountInRs} <br><span style="font-size:0.7rem; color:gray;">(${w.coins} Coins)</span></span></td>
+                <td data-label="Status"><span class="badge ${badgeClass}">${w.status}</span></td>
             `;
 
             if(isPending) {
                 html += `
-                <td>
+                <td data-label="Action">
                     <div class="action-btns">
                         <button class="btn btn-small" onclick="approveReq('${w.docId}')"><i class="fa-solid fa-check"></i></button>
                         <button class="btn btn-danger btn-small" onclick="rejectReq('${w.docId}', '${w.userId}', ${w.coins})"><i class="fa-solid fa-times"></i></button>
@@ -382,7 +408,7 @@
         });
     }
 
-    // --- RENDER ALL USERS ---
+    // --- RENDER ALL USERS (DATA LABELS ADDED FOR MOBILE CSS) ---
     function renderUsers() {
         const tbody = document.getElementById('tbody-users');
         tbody.innerHTML = '';
@@ -392,7 +418,6 @@
             return;
         }
 
-        // Sort by newest joined
         const sortedUsers = [...allUsers].sort((a,b) => (b.createdAt || 0) - (a.createdAt || 0));
 
         sortedUsers.forEach(u => {
@@ -403,31 +428,30 @@
 
             const tr = document.createElement('tr');
             tr.innerHTML = `
-                <td style="font-size: 0.8rem; color: var(--text-muted);">${dateStr}</td>
-                <td>
-                    <div style="font-weight: 600; color: white;">${name}</div>
-                    <div style="font-size: 0.75rem; color: var(--text-muted);">ID: ${u.id.substring(0,8)}...</div>
+                <td data-label="Joined"><span style="font-size: 0.8rem; color: var(--text-muted);">${dateStr}</span></td>
+                <td data-label="User Info">
+                    <div>
+                        <div style="font-weight: 600; color: white;">${name}</div>
+                        <div style="font-size: 0.75rem; color: var(--text-muted);">ID: ${u.id.substring(0,8)}...</div>
+                    </div>
                 </td>
-                <td style="font-size: 0.85rem;">${phone}</td>
-                <td style="color: gold; font-weight: bold;"><i class="fa-solid fa-coins"></i> ${coins.toLocaleString()}</td>
-                <td style="font-weight: bold; letter-spacing: 1px;">${u.refCode || '---'}</td>
-                <td>
-                    <button class="btn btn-info btn-small" onclick="openUserModal('${u.id}')"><i class="fa-solid fa-eye"></i> Profile Log</button>
+                <td data-label="Contact"><span style="font-size: 0.85rem;">${phone}</span></td>
+                <td data-label="Balance"><span style="color: gold; font-weight: bold;"><i class="fa-solid fa-coins"></i> ${coins.toLocaleString()}</span></td>
+                <td data-label="Ref Code"><span style="font-weight: bold; letter-spacing: 1px;">${u.refCode || '---'}</span></td>
+                <td data-label="Action">
+                    <button class="btn btn-info btn-small" onclick="openUserModal('${u.id}')"><i class="fa-solid fa-eye"></i> Log</button>
                 </td>
             `;
             tbody.appendChild(tr);
         });
     }
 
-    // --- RENDER LEADERBOARD ---
+    // --- RENDER LEADERBOARD (DATA LABELS ADDED FOR MOBILE CSS) ---
     function renderLeaderboard() {
         const tbody = document.getElementById('tbody-leaderboard');
         tbody.innerHTML = '';
 
-        // Sort strictly by Coins (Highest to lowest)
         const sortedUsers = [...allUsers].sort((a,b) => (b.coins || 0) - (a.coins || 0));
-
-        // Display Top 50 maximum
         const topUsers = sortedUsers.slice(0, 50);
 
         if(topUsers.length === 0) {
@@ -446,16 +470,16 @@
 
             const tr = document.createElement('tr');
             tr.innerHTML = `
-                <td>${rankHtml}</td>
-                <td style="font-weight: 600; color: white; font-size: 1.1rem;">${name}</td>
-                <td style="font-size: 0.8rem; color: var(--text-muted);">${u.id}</td>
-                <td style="color: gold; font-weight: bold; font-size: 1.2rem;"><i class="fa-solid fa-coins"></i> ${(u.coins || 0).toLocaleString()}</td>
+                <td data-label="Rank">${rankHtml}</td>
+                <td data-label="User Name"><span style="font-weight: 600; color: white; font-size: 1.1rem;">${name}</span></td>
+                <td data-label="User ID"><span style="font-size: 0.8rem; color: var(--text-muted);">${u.id}</span></td>
+                <td data-label="Total Coins"><span style="color: gold; font-weight: bold; font-size: 1.2rem;"><i class="fa-solid fa-coins"></i> ${(u.coins || 0).toLocaleString()}</span></td>
             `;
             tbody.appendChild(tr);
         });
     }
 
-    // --- MODAL LOGIC (USER COIN HISTORY) ---
+    // --- MODAL LOGIC ---
     window.openUserModal = (userId) => {
         const user = allUsers.find(u => u.id === userId);
         if(!user) return;
