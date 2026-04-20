@@ -89,6 +89,11 @@
         .loader { border: 4px solid var(--card-border); border-top: 4px solid var(--primary); border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: 20px auto; display: none; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
+        .rank-badge { width: 30px; height: 30px; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-weight: bold; background: var(--bg-darker); border: 1px solid var(--card-border); }
+        .rank-1 { background: gold; color: black; border-color: gold; box-shadow: 0 0 10px gold; }
+        .rank-2 { background: silver; color: black; border-color: silver; }
+        .rank-3 { background: #cd7f32; color: white; border-color: #cd7f32; }
+
         @media screen and (max-width: 768px) {
             .header { flex-direction: column; align-items: flex-start; gap: 15px; }
             .header .btn { width: auto; align-self: flex-start; }
@@ -98,8 +103,10 @@
             thead tr { position: absolute; top: -9999px; left: -9999px; } 
             tr { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; margin-bottom: 15px; overflow: hidden; }
             td { display: flex; justify-content: space-between; align-items: center; padding: 12px 15px; border-bottom: 1px dashed var(--card-border); text-align: right; font-size: 0.9rem; }
+            td:last-child { border-bottom: none; background: rgba(0,0,0,0.2); }
             td::before { content: attr(data-label); font-weight: 600; color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase; margin-right: 15px; text-align: left; }
             .action-btns { justify-content: flex-end; width: 100%; gap: 5px; }
+            .modal-content { padding: 20px 15px; width: 95%; max-height: 90vh; }
         }
     </style>
 </head>
@@ -118,7 +125,7 @@
                 <span id="modal-user-coins" style="font-size: 1.5rem; font-weight: bold; color: gold;"><i class="fa-solid fa-coins"></i> 0</span>
             </div>
 
-            <h3 style="margin-bottom: 15px; font-size: 1.1rem; border-bottom: 1px solid var(--card-border); padding-bottom: 10px;">Full Activity Log (Detailed Time)</h3>
+            <h3 style="margin-bottom: 15px; font-size: 1.1rem; border-bottom: 1px solid var(--card-border); padding-bottom: 10px;">Full Activity Log</h3>
             <div id="modal-tx-list">
                 </div>
         </div>
@@ -240,14 +247,15 @@
     let allUsers = [];
     let currentTab = 'withdraw-pending';
 
-    // 🔥 NEW: Function to Format Date & Time AM/PM
+    // 🔥 FORCE IST TIMEZONE (Asia/Kolkata) 🔥
     const formatFullTime = (timestamp) => {
         if (!timestamp) return 'Unknown';
         const dateObj = new Date(typeof timestamp === 'number' ? timestamp : timestamp.seconds * 1000);
         return dateObj.toLocaleString('en-IN', {
+            timeZone: 'Asia/Kolkata',
             day: '2-digit', month: 'short', year: 'numeric',
             hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true
-        });
+        }) + " IST";
     };
 
     window.showToast = (msg, isError = false) => {
@@ -297,7 +305,7 @@
             });
             allWithdrawals.sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
             document.getElementById('stat-pending').innerText = pendingCount;
-            document.getElementById('stat-paid').innerText = `₹${totalPaidCoins / 100 * 1}`;
+            document.getElementById('stat-paid').innerText = `₹${(totalPaidCoins / 10000) * 100}`;
             window.refreshActiveTab();
         } catch (e) { window.showToast("Error loading data", true); }
         document.getElementById('main-loader').style.display = 'none';
@@ -330,9 +338,9 @@
                 <td data-label="Date & Time"><span style="font-size: 0.8rem; font-weight: 600; color: white;">${formatFullTime(w.createdAt)}</span></td>
                 <td data-label="User ID">...${w.userId.substring(0,8)}</td>
                 <td data-label="UPI ID">${w.upiId}</td>
-                <td data-label="Amount">₹${(w.coins / 100).toFixed(2)}</td>
+                <td data-label="Amount">₹${((w.coins / 10000) * 100).toFixed(2)}</td>
                 <td data-label="Status"><span class="badge ${w.status === 'Approved' ? 'badge-approved' : (w.status === 'Rejected' ? 'badge-rejected' : 'badge-pending')}">${w.status}</span></td>
-                ${isPending ? `<td data-label="Action"><div class="action-btns"><button class="btn btn-small" onclick="approveReq('${w.docId}')">✔</button><button class="btn btn-danger btn-small" onclick="rejectReq('${w.docId}', '${w.userId}', ${w.coins})">✖</button></div></td>` : ''}
+                ${isPending ? `<td data-label="Action"><div class="action-btns"><button class="btn btn-small" onclick="approveReq('${w.docId}')"><i class="fa-solid fa-check"></i></button><button class="btn btn-danger btn-small" onclick="rejectReq('${w.docId}', '${w.userId}', ${w.coins})"><i class="fa-solid fa-times"></i></button></div></td>` : '<td style="display:none;"></td>'}
             `;
             tbody.appendChild(tr);
         });
@@ -345,11 +353,43 @@
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td data-label="Joined"><span style="font-size: 0.8rem; font-weight: 600; color: #10b981;">${formatFullTime(u.createdAt)}</span></td>
-                <td data-label="User Info">${u.profile?.name || 'Unknown'}</td>
+                <td data-label="User Info">${u.profile?.name || 'Unknown'} <br><span style="font-size: 0.75rem; color: var(--text-muted);">ID: ${u.id.substring(0,8)}...</span></td>
                 <td data-label="Contact">${u.profile?.phone || u.phone}</td>
-                <td data-label="Balance">${(u.coins || 0).toLocaleString()}</td>
+                <td data-label="Balance"><span style="color: gold; font-weight: bold;"><i class="fa-solid fa-coins"></i> ${(u.coins || 0).toLocaleString()}</span></td>
                 <td data-label="Ref Code">${u.refCode || '---'}</td>
-                <td data-label="Action"><div class="action-btns"><button class="btn btn-info btn-small" onclick="openUserModal('${u.id}')">Eye</button><button class="btn btn-warning btn-small" onclick="editUserBalance('${u.id}', ${u.coins})">Edit</button></div></td>
+                <td data-label="Action"><div class="action-btns"><button class="btn btn-info btn-small" onclick="openUserModal('${u.id}')"><i class="fa-solid fa-eye"></i> Log</button><button class="btn btn-warning btn-small" onclick="editUserBalance('${u.id}', ${u.coins})"><i class="fa-solid fa-pen"></i> Balance</button></div></td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    function renderLeaderboard() {
+        const tbody = document.getElementById('tbody-leaderboard');
+        tbody.innerHTML = '';
+
+        const sortedUsers = [...allUsers].sort((a,b) => (b.coins || 0) - (a.coins || 0));
+        const topUsers = sortedUsers.slice(0, 50);
+
+        if(topUsers.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color: var(--text-muted);">Leaderboard empty.</td></tr>`;
+            return;
+        }
+
+        topUsers.forEach((u, index) => {
+            const rank = index + 1;
+            const name = (u.profile && u.profile.name) ? u.profile.name : 'Unknown User';
+            
+            let rankHtml = `<div class="rank-badge">${rank}</div>`;
+            if(rank === 1) rankHtml = `<div class="rank-badge rank-1"><i class="fa-solid fa-crown"></i></div>`;
+            else if(rank === 2) rankHtml = `<div class="rank-badge rank-2">2</div>`;
+            else if(rank === 3) rankHtml = `<div class="rank-badge rank-3">3</div>`;
+
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td data-label="Rank">${rankHtml}</td>
+                <td data-label="User Name"><span style="font-weight: 600; color: white; font-size: 1.1rem;">${name}</span></td>
+                <td data-label="User ID"><span style="font-size: 0.8rem; color: var(--text-muted);">${u.id}</span></td>
+                <td data-label="Total Coins"><span style="color: gold; font-weight: bold; font-size: 1.2rem;"><i class="fa-solid fa-coins"></i> ${(u.coins || 0).toLocaleString()}</span></td>
             `;
             tbody.appendChild(tr);
         });
@@ -358,42 +398,95 @@
     window.openUserModal = (userId) => {
         const user = allUsers.find(u => u.id === userId); if(!user) return;
         document.getElementById('modal-user-name').innerText = user.profile?.name || 'Unknown User';
-        document.getElementById('modal-user-id').innerText = `ID: ${user.id}`;
+        document.getElementById('modal-user-id').innerText = `ID: ${user.id} | Ref Code: ${user.refCode || 'N/A'}`;
         document.getElementById('modal-user-coins').innerHTML = `<i class="fa-solid fa-coins"></i> ${(user.coins || 0).toLocaleString()}`;
         const txList = document.getElementById('modal-tx-list'); txList.innerHTML = '';
-        if(user.transactions) {
+        if(user.transactions && user.transactions.length > 0) {
             user.transactions.sort((a,b) => b.date - a.date).forEach(t => {
                 txList.innerHTML += `<div class="history-item"><div class="h-info"><span class="h-title">${t.title}</span><span class="h-time" style="font-weight:600; color:white;">${formatFullTime(t.date)}</span></div><div class="h-amt ${t.type === 'earn' ? 'text-green' : 'text-danger'}">${t.type === 'earn' ? '+' : '-'}${t.amount}</div></div>`;
             });
+        } else {
+            txList.innerHTML = `<p style="text-align:center; color:var(--text-muted); padding:20px;">No transaction history found for this user.</p>`;
         }
         document.getElementById('user-modal').style.display = 'flex';
     }
 
     window.closeUserModal = () => { document.getElementById('user-modal').style.display = 'none'; }
 
-    // Admin Action functions (approveReq, rejectReq, editUserBalance) would remain the same as previous version...
-    window.approveReq = async (docId) => {
-        if(!confirm("Approve?")) return;
-        await updateDoc(doc(db, "earnx_withdrawals", docId), { status: "Approved" });
-        window.loadDashboardData();
-    }
-
-    window.rejectReq = async (docId, userId, coins) => {
-        if(!confirm("Reject?")) return;
-        await updateDoc(doc(db, "earnx_withdrawals", docId), { status: "Rejected" });
-        const userRef = doc(db, "earnx_users", userId);
-        const snap = await getDoc(userRef);
-        await updateDoc(userRef, { coins: (snap.data().coins || 0) + coins });
-        window.loadDashboardData();
-    }
-
-    window.editUserBalance = async (userId, current) => {
-        const val = prompt("Change balance by (+ or -):", "0");
-        if(val) {
+    window.editUserBalance = async (userId, currentCoins) => {
+        const val = prompt(`Current Balance: ${currentCoins} Coins\n\nEnter amount to ADD (e.g. 50000) or DEDUCT (e.g. -10000):`);
+        if(val === null || val.trim() === "") return;
+        
+        const amount = parseInt(val);
+        if(isNaN(amount)) return window.showToast("Invalid number entered!", true);
+        
+        const newBalance = currentCoins + amount;
+        if(newBalance < 0) return window.showToast("Balance cannot be less than 0!", true);
+        
+        if(!confirm(`Are you sure? This user's new balance will be ${newBalance} Coins.`)) return;
+        
+        try {
             const userRef = doc(db, "earnx_users", userId);
-            await updateDoc(userRef, { coins: current + parseInt(val) });
-            window.loadDashboardData();
+            const userSnap = await getDoc(userRef);
+            
+            if(userSnap.exists()) {
+                const userData = userSnap.data();
+                let txs = userData.transactions || [];
+                
+                const txType = amount >= 0 ? "earn" : "spend";
+                
+                txs.unshift({ 
+                    title: "Admin Adjustment", 
+                    amount: Math.abs(amount), 
+                    type: txType, 
+                    date: Date.now() 
+                });
+                if(txs.length > 50) txs.pop();
+                
+                await updateDoc(userRef, { 
+                    coins: newBalance, 
+                    transactions: txs 
+                });
+                
+                window.showToast("Balance Updated Successfully!");
+                window.loadDashboardData(); 
+            }
+        } catch(e) {
+            window.showToast("Error updating balance", true);
         }
+    }
+
+    window.approveReq = async (docId) => {
+        if(!confirm("Are you sure you want to APPROVE this payment?")) return;
+        try {
+            await updateDoc(doc(db, "earnx_withdrawals", docId), { status: "Approved" });
+            window.showToast("Payment Approved!");
+            window.loadDashboardData(); 
+        } catch(e) { window.showToast("Error approving", true); }
+    }
+
+    window.rejectReq = async (docId, userId, coinAmount) => {
+        const reason = prompt("Enter reason for rejection (e.g. Invalid UPI, Cheating):");
+        if(reason === null) return; 
+        
+        try {
+            await updateDoc(doc(db, "earnx_withdrawals", docId), { status: "Rejected", reason: reason || "Admin Rejected" });
+            const userRef = doc(db, "earnx_users", userId);
+            const userSnap = await getDoc(userRef);
+            
+            if(userSnap.exists()) {
+                const userData = userSnap.data();
+                const newBalance = (Number(userData.coins) || 0) + coinAmount;
+                let txs = userData.transactions || [];
+                txs.unshift({ title: "Refund: " + (reason || "Withdrawal Rejected"), amount: coinAmount, type: "earn", date: Date.now() });
+                if(txs.length > 50) txs.pop();
+                await updateDoc(userRef, { coins: newBalance, transactions: txs });
+            }
+
+            window.showToast("Rejected & Coins Refunded to User!");
+            window.loadDashboardData(); 
+
+        } catch(e) { window.showToast("Error processing reject", true); }
     }
 </script>
 </body>
