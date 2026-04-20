@@ -36,6 +36,8 @@
         .btn-danger:hover { background: #dc2626; }
         .btn-info { background: var(--info); }
         .btn-info:hover { background: #2563eb; }
+        .btn-warning { background: var(--warning); color: black; }
+        .btn-warning:hover { background: #d97706; }
         .btn-small { padding: 8px 12px; font-size: 0.85rem; width: auto; }
 
         /* DASHBOARD */
@@ -68,7 +70,7 @@
         .badge-approved { background: rgba(16, 185, 129, 0.2); color: var(--primary); }
         .badge-rejected { background: rgba(239, 68, 68, 0.2); color: var(--danger); }
 
-        .action-btns { display: flex; gap: 10px; }
+        .action-btns { display: flex; gap: 10px; flex-wrap: wrap; }
 
         /* MODAL */
         #user-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 10000; justify-content: center; align-items: center; padding: 20px; }
@@ -92,7 +94,7 @@
         .rank-2 { background: silver; color: black; border-color: silver; }
         .rank-3 { background: #cd7f32; color: white; border-color: #cd7f32; }
 
-        /* 🔥 RESPONSIVE MOBILE FIX (THE DHANSU PART) 🔥 */
+        /* 🔥 RESPONSIVE MOBILE FIX 🔥 */
         @media screen and (max-width: 768px) {
             .header { flex-direction: column; align-items: flex-start; gap: 15px; }
             .header .btn { width: auto; align-self: flex-start; }
@@ -101,20 +103,18 @@
             .stat-card { padding: 20px; }
             .stat-card .value { font-size: 2.2rem; }
 
-            /* Table to Cards Conversion */
             .table-container { background: transparent; border: none; }
             table, thead, tbody, th, td, tr { display: block; width: 100%; }
-            thead tr { position: absolute; top: -9999px; left: -9999px; } /* Hide Table Head */
+            thead tr { position: absolute; top: -9999px; left: -9999px; } 
             
             tr { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; margin-bottom: 15px; overflow: hidden; }
             
             td { display: flex; justify-content: space-between; align-items: center; padding: 12px 15px; border-bottom: 1px dashed var(--card-border); text-align: right; font-size: 0.9rem; }
             td:last-child { border-bottom: none; background: rgba(0,0,0,0.2); }
             
-            /* Creating Pseudo-Labels for data */
             td::before { content: attr(data-label); font-weight: 600; color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase; margin-right: 15px; text-align: left; }
             
-            .action-btns { justify-content: flex-end; width: 100%; }
+            .action-btns { justify-content: flex-end; width: 100%; gap: 5px; }
             .modal-content { padding: 20px 15px; width: 95%; max-height: 90vh; }
         }
     </style>
@@ -297,7 +297,6 @@
         allUsers = [];
 
         try {
-            // Fetch Users
             const userSnap = await getDocs(collection(db, "earnx_users"));
             userSnap.forEach(doc => {
                 const uData = doc.data();
@@ -306,7 +305,6 @@
             });
             document.getElementById('stat-users').innerText = allUsers.length;
 
-            // Fetch Withdrawals
             const wSnap = await getDocs(collection(db, "earnx_withdrawals"));
             let pendingCount = 0;
             let totalPaidCoins = 0;
@@ -338,11 +336,9 @@
     window.switchTab = (tab) => {
         currentTab = tab;
         
-        // Update Tab Styling
         document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
         document.getElementById(`tab-${tab}`).classList.add('active');
         
-        // Update Sections visibility
         document.querySelectorAll('.table-container').forEach(c => c.classList.remove('active'));
         
         if(tab.startsWith('withdraw')) {
@@ -363,7 +359,6 @@
         else if (currentTab === 'leaderboard') renderLeaderboard();
     }
 
-    // --- RENDER WITHDRAWALS (DATA LABELS ADDED FOR MOBILE CSS) ---
     function renderWithdrawals() {
         const tbody = document.getElementById('tbody-withdrawals');
         tbody.innerHTML = '';
@@ -408,7 +403,6 @@
         });
     }
 
-    // --- RENDER ALL USERS (DATA LABELS ADDED FOR MOBILE CSS) ---
     function renderUsers() {
         const tbody = document.getElementById('tbody-users');
         tbody.innerHTML = '';
@@ -439,14 +433,16 @@
                 <td data-label="Balance"><span style="color: gold; font-weight: bold;"><i class="fa-solid fa-coins"></i> ${coins.toLocaleString()}</span></td>
                 <td data-label="Ref Code"><span style="font-weight: bold; letter-spacing: 1px;">${u.refCode || '---'}</span></td>
                 <td data-label="Action">
-                    <button class="btn btn-info btn-small" onclick="openUserModal('${u.id}')"><i class="fa-solid fa-eye"></i> Log</button>
+                    <div class="action-btns">
+                        <button class="btn btn-info btn-small" onclick="openUserModal('${u.id}')"><i class="fa-solid fa-eye"></i> Log</button>
+                        <button class="btn btn-warning btn-small" onclick="editUserBalance('${u.id}', ${coins})"><i class="fa-solid fa-pen"></i> Balance</button>
+                    </div>
                 </td>
             `;
             tbody.appendChild(tr);
         });
     }
 
-    // --- RENDER LEADERBOARD (DATA LABELS ADDED FOR MOBILE CSS) ---
     function renderLeaderboard() {
         const tbody = document.getElementById('tbody-leaderboard');
         tbody.innerHTML = '';
@@ -479,7 +475,6 @@
         });
     }
 
-    // --- MODAL LOGIC ---
     window.openUserModal = (userId) => {
         const user = allUsers.find(u => u.id === userId);
         if(!user) return;
@@ -519,7 +514,51 @@
         document.getElementById('user-modal').style.display = 'none';
     }
 
-    // --- WITHDRAWAL ACTIONS ---
+    // 🔥 NEW: Add or Deduct User Balance For Screenshots 🔥
+    window.editUserBalance = async (userId, currentCoins) => {
+        const val = prompt(`Current Balance: ${currentCoins} Coins\n\nEnter amount to ADD (e.g. 50000) or DEDUCT (e.g. -10000):`);
+        if(val === null || val.trim() === "") return;
+        
+        const amount = parseInt(val);
+        if(isNaN(amount)) return window.showToast("Invalid number entered!", true);
+        
+        const newBalance = currentCoins + amount;
+        if(newBalance < 0) return window.showToast("Balance cannot be less than 0!", true);
+        
+        if(!confirm(`Are you sure? This user's new balance will be ${newBalance} Coins.`)) return;
+        
+        try {
+            const userRef = doc(db, "earnx_users", userId);
+            const userSnap = await getDoc(userRef);
+            
+            if(userSnap.exists()) {
+                const userData = userSnap.data();
+                let txs = userData.transactions || [];
+                
+                const txType = amount >= 0 ? "earn" : "spend";
+                
+                // Transaction add karo taaki fake na lage
+                txs.unshift({ 
+                    title: "Admin Adjustment", 
+                    amount: Math.abs(amount), 
+                    type: txType, 
+                    date: Date.now() 
+                });
+                if(txs.length > 50) txs.pop();
+                
+                await updateDoc(userRef, { 
+                    coins: newBalance, 
+                    transactions: txs 
+                });
+                
+                window.showToast("Balance Updated Successfully!");
+                window.loadDashboardData(); 
+            }
+        } catch(e) {
+            window.showToast("Error updating balance", true);
+        }
+    }
+
     window.approveReq = async (docId) => {
         if(!confirm("Are you sure you want to APPROVE this payment?")) return;
         try {
