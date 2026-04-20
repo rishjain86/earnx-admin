@@ -247,7 +247,7 @@
     let allUsers = [];
     let currentTab = 'withdraw-pending';
 
-    // 🔥 FORCE IST TIMEZONE (Asia/Kolkata) 🔥
+    // Time Formatting to IST
     const formatFullTime = (timestamp) => {
         if (!timestamp) return 'Unknown';
         const dateObj = new Date(typeof timestamp === 'number' ? timestamp : timestamp.seconds * 1000);
@@ -256,6 +256,12 @@
             day: '2-digit', month: 'short', year: 'numeric',
             hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true
         }) + " IST";
+    };
+
+    // Safe timestamp getter for Sorting
+    const getSafeMs = (timestamp) => {
+        if (!timestamp) return 0;
+        return typeof timestamp === 'number' ? timestamp : (timestamp.seconds * 1000);
     };
 
     window.showToast = (msg, isError = false) => {
@@ -303,7 +309,7 @@
                 if(data.status === "Pending") pendingCount++;
                 if(data.status === "Approved") totalPaidCoins += data.coins;
             });
-            allWithdrawals.sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+            allWithdrawals.sort((a,b) => getSafeMs(b.createdAt) - getSafeMs(a.createdAt));
             document.getElementById('stat-pending').innerText = pendingCount;
             document.getElementById('stat-paid').innerText = `₹${(totalPaidCoins / 10000) * 100}`;
             window.refreshActiveTab();
@@ -348,7 +354,7 @@
 
     function renderUsers() {
         const tbody = document.getElementById('tbody-users'); tbody.innerHTML = '';
-        const sorted = [...allUsers].sort((a,b) => (b.createdAt || 0) - (a.createdAt || 0));
+        const sorted = [...allUsers].sort((a,b) => getSafeMs(b.createdAt) - getSafeMs(a.createdAt));
         sorted.forEach(u => {
             const tr = document.createElement('tr');
             tr.innerHTML = `
@@ -400,9 +406,11 @@
         document.getElementById('modal-user-name').innerText = user.profile?.name || 'Unknown User';
         document.getElementById('modal-user-id').innerText = `ID: ${user.id} | Ref Code: ${user.refCode || 'N/A'}`;
         document.getElementById('modal-user-coins').innerHTML = `<i class="fa-solid fa-coins"></i> ${(user.coins || 0).toLocaleString()}`;
+        
         const txList = document.getElementById('modal-tx-list'); txList.innerHTML = '';
-        if(user.transactions && user.transactions.length > 0) {
-            user.transactions.sort((a,b) => b.date - a.date).forEach(t => {
+        
+        if(user.transactions && Array.isArray(user.transactions) && user.transactions.length > 0) {
+            user.transactions.sort((a,b) => getSafeMs(b.date) - getSafeMs(a.date)).forEach(t => {
                 txList.innerHTML += `<div class="history-item"><div class="h-info"><span class="h-title">${t.title}</span><span class="h-time" style="font-weight:600; color:white;">${formatFullTime(t.date)}</span></div><div class="h-amt ${t.type === 'earn' ? 'text-green' : 'text-danger'}">${t.type === 'earn' ? '+' : '-'}${t.amount}</div></div>`;
             });
         } else {
@@ -413,12 +421,13 @@
 
     window.closeUserModal = () => { document.getElementById('user-modal').style.display = 'none'; }
 
+    // 🔥 INSTANT UPDATE LOGIC 🔥
     window.editUserBalance = async (userId, currentCoins) => {
         const val = prompt(`Current Balance: ${currentCoins} Coins\n\nEnter amount to ADD (e.g. 50000) or DEDUCT (e.g. -10000):`);
         if(val === null || val.trim() === "") return;
         
         const amount = parseInt(val);
-        if(isNaN(amount)) return window.showToast("Invalid number entered!", true);
+        if(isNaN(amount) || amount === 0) return window.showToast("Invalid number entered!", true);
         
         const newBalance = currentCoins + amount;
         if(newBalance < 0) return window.showToast("Balance cannot be less than 0!", true);
@@ -431,25 +440,38 @@
             
             if(userSnap.exists()) {
                 const userData = userSnap.data();
-                let txs = userData.transactions || [];
                 
-                const txType = amount >= 0 ? "earn" : "spend";
+                // Safe check taaki error na aaye
+                let txs = Array.isArray(userData.transactions) ? userData.transactions : [];
                 
-                txs.unshift({ 
+                const txType = amount > 0 ? "earn" : "spend";
+                
+                // Nayi Entry Banayi
+                const newTx = { 
                     title: "Admin Adjustment", 
                     amount: Math.abs(amount), 
                     type: txType, 
                     date: Date.now() 
-                });
+                };
+
+                txs.unshift(newTx);
                 if(txs.length > 50) txs.pop();
                 
+                // Firebase me update kiya
                 await updateDoc(userRef, { 
                     coins: newBalance, 
                     transactions: txs 
                 });
                 
+                // ⚡ JADOO: Bina reload kiye memory mein update kar diya!
+                const localUser = allUsers.find(u => u.id === userId);
+                if(localUser) {
+                    localUser.coins = newBalance;
+                    localUser.transactions = txs;
+                }
+                
                 window.showToast("Balance Updated Successfully!");
-                window.loadDashboardData(); 
+                window.refreshActiveTab(); // Table turant update ho jayegi
             }
         } catch(e) {
             window.showToast("Error updating balance", true);
@@ -477,9 +499,10 @@
             if(userSnap.exists()) {
                 const userData = userSnap.data();
                 const newBalance = (Number(userData.coins) || 0) + coinAmount;
-                let txs = userData.transactions || [];
+                let txs = Array.isArray(userData.transactions) ? userData.transactions : [];
                 txs.unshift({ title: "Refund: " + (reason || "Withdrawal Rejected"), amount: coinAmount, type: "earn", date: Date.now() });
                 if(txs.length > 50) txs.pop();
+                
                 await updateDoc(userRef, { coins: newBalance, transactions: txs });
             }
 
