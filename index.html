@@ -100,10 +100,12 @@
         .rank-2 { background: silver; color: black; border-color: silver; }
         .rank-3 { background: #cd7f32; color: white; border-color: #cd7f32; }
 
-        /* NOTICE & SETTINGS SECTION INPUTS */
         .notice-input { width: 100%; padding: 15px; margin-bottom: 20px; border-radius: 10px; background: var(--bg-darker); border: 1px solid var(--card-border); color: white; font-family: 'Inter', sans-serif; font-size: 1rem; outline: none; }
         .notice-input:focus { border-color: var(--primary); }
         .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+
+        /* Admin Controls Inside Modal */
+        .admin-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding-top: 15px; border-top: 1px dashed var(--card-border); margin-top: 20px; }
 
         @media screen and (max-width: 768px) {
             .header { flex-direction: column; align-items: flex-start; gap: 15px; }
@@ -129,7 +131,12 @@
     <div id="user-modal">
         <div class="modal-content">
             <i class="fa-solid fa-times close-btn" onclick="closeUserModal()"></i>
-            <h2 id="modal-user-name" style="margin-bottom: 5px; color: var(--primary);">User History</h2>
+            
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 5px;">
+                <h2 id="modal-user-name" style="color: var(--primary); margin: 0;">User History</h2>
+                <span id="modal-block-status" class="badge badge-rejected" style="display: none;">BLOCKED</span>
+            </div>
+            
             <p id="modal-user-id" style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 20px;">ID: ---</p>
             
             <div style="background: rgba(16, 185, 129, 0.1); padding: 15px; border-radius: 10px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; border: 1px solid var(--primary);">
@@ -146,8 +153,13 @@
                 <div class="user-stat-box"><span>Last Active Date</span><b id="modal-last-active">...</b></div>
             </div>
 
-            <h3 style="margin-top: 10px; margin-bottom: 15px; font-size: 1.1rem; border-bottom: 1px solid var(--card-border); padding-bottom: 10px;">Full Activity Log</h3>
-            <div id="modal-tx-list"></div>
+            <h3 style="margin-top: 10px; margin-bottom: 10px; font-size: 1.1rem; border-bottom: 1px solid var(--card-border); padding-bottom: 10px;">Full Activity Log</h3>
+            <div id="modal-tx-list" style="max-height: 200px; overflow-y: auto; margin-bottom: 10px; border: 1px solid var(--card-border); padding: 10px; border-radius: 8px; background: var(--bg-dark);"></div>
+
+            <div class="admin-controls">
+                <button class="btn btn-warning" id="btn-alert" onclick="sendPersonalAlert()"><i class="fa-solid fa-triangle-exclamation"></i> Send Alert</button>
+                <button class="btn btn-danger" id="btn-block" onclick="toggleBlockUser()"><i class="fa-solid fa-ban"></i> Block User</button>
+            </div>
         </div>
     </div>
 
@@ -222,7 +234,7 @@
                         <th>User Identity</th>
                         <th>Phone/Email</th>
                         <th>Coins Balance</th>
-                        <th>Ref Code</th>
+                        <th>Status</th>
                         <th>Action</th>
                     </tr>
                 </thead>
@@ -302,6 +314,7 @@
     let allWithdrawals = [];
     let allUsers = [];
     let currentTab = 'withdraw-pending';
+    let currentOpenUserId = null; // Track currently open user in modal
 
     const formatFullTime = (timestamp) => {
         if (!timestamp) return 'Unknown';
@@ -367,14 +380,12 @@
             document.getElementById('stat-pending').innerText = pendingCount;
             document.getElementById('stat-paid').innerText = `₹${(totalPaidCoins / 10000) * 100}`;
             
-            // 🔥 Load Notice Data 🔥
             const noticeSnap = await getDoc(doc(db, "earnx_settings", "app_notice"));
             if(noticeSnap.exists()) {
                 document.getElementById('notice-status').value = noticeSnap.data().isActive ? "true" : "false";
                 document.getElementById('notice-msg').value = noticeSnap.data().message || "";
             }
 
-            // 🔥 Load Promo Code Data 🔥
             const promoSnap = await getDoc(doc(db, "earnx_settings", "active_promo"));
             if(promoSnap.exists()) {
                 document.getElementById('admin-promo-code').value = promoSnap.data().code || "";
@@ -385,34 +396,22 @@
         document.getElementById('main-loader').style.display = 'none';
     }
 
-    // 🔥 SAVE NOTICE LOGIC 🔥
     window.saveNotice = async () => {
         const status = document.getElementById('notice-status').value === "true";
         const msg = document.getElementById('notice-msg').value.trim();
 
-        if (status && msg === "") {
-            window.showToast("Please enter a message to display!", true);
-            return;
-        }
+        if (status && msg === "") return window.showToast("Please enter a message to display!", true);
         try {
-            await setDoc(doc(db, "earnx_settings", "app_notice"), {
-                isActive: status, message: msg, updatedAt: Date.now()
-            });
+            await setDoc(doc(db, "earnx_settings", "app_notice"), { isActive: status, message: msg, updatedAt: Date.now() });
             window.showToast("Global Notice Updated!");
         } catch (error) { window.showToast("Error saving notice!", true); }
     };
 
-    // 🔥 SAVE PROMO CODE LOGIC 🔥
     window.savePromoCode = async () => {
         const code = document.getElementById('admin-promo-code').value.trim().toUpperCase();
-        if (code === "") {
-            window.showToast("Please enter a promo code!", true);
-            return;
-        }
+        if (code === "") return window.showToast("Please enter a promo code!", true);
         try {
-            await setDoc(doc(db, "earnx_settings", "active_promo"), {
-                code: code, updatedAt: Date.now()
-            });
+            await setDoc(doc(db, "earnx_settings", "active_promo"), { code: code, updatedAt: Date.now() });
             window.showToast("Promo Code Updated Successfully!");
         } catch (error) { window.showToast("Error saving promo code!", true); }
     };
@@ -460,17 +459,19 @@
         const tbody = document.getElementById('tbody-users'); tbody.innerHTML = '';
         const sorted = [...allUsers].sort((a,b) => getSafeMs(b.createdAt) - getSafeMs(a.createdAt));
         sorted.forEach(u => {
-            // Calculate Age for the table
             const ageMs = Date.now() - getSafeMs(u.createdAt);
             const ageDays = Math.floor(ageMs / (1000 * 60 * 60 * 24));
             
+            // Show if user is blocked in the table
+            let statusBadge = u.isBlocked ? `<span class="badge badge-rejected">BLOCKED</span>` : `<span class="badge badge-approved">ACTIVE</span>`;
+
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td data-label="Account Info"><span style="font-size: 0.8rem; font-weight: 600; color: #10b981;">Joined: ${ageDays} days ago</span><br><span style="font-size: 0.7rem; color: var(--text-muted);">${formatFullTime(u.createdAt)}</span></td>
                 <td data-label="User Info">${u.profile?.name || 'Unknown'} <br><span style="font-size: 0.75rem; color: var(--text-muted);">ID: ${u.id.substring(0,8)}...</span></td>
                 <td data-label="Contact">${u.profile?.phone || u.phone}</td>
                 <td data-label="Balance"><span style="color: gold; font-weight: bold;"><i class="fa-solid fa-coins"></i> ${(u.coins || 0).toLocaleString()}</span></td>
-                <td data-label="Ref Code">${u.refCode || '---'}</td>
+                <td data-label="Status">${statusBadge}</td>
                 <td data-label="Action"><div class="action-btns"><button class="btn btn-info btn-small" onclick="openUserModal('${u.id}')"><i class="fa-solid fa-eye"></i> Log / Details</button><button class="btn btn-warning btn-small" onclick="editUserBalance('${u.id}', ${u.coins})"><i class="fa-solid fa-pen"></i> Balance</button></div></td>
             `;
             tbody.appendChild(tr);
@@ -478,71 +479,67 @@
     }
 
     function renderLeaderboard() {
-        const tbody = document.getElementById('tbody-leaderboard');
-        tbody.innerHTML = '';
-
-        const sortedUsers = [...allUsers].sort((a,b) => (b.coins || 0) - (a.coins || 0));
+        const tbody = document.getElementById('tbody-leaderboard'); tbody.innerHTML = '';
+        const sortedUsers = [...allUsers].sort((a,b) => (b.coins || 0) - (a.coins || 0)).filter(u => !u.isBlocked); // Exclude blocked users from leaderboard
         const topUsers = sortedUsers.slice(0, 50);
 
-        if(topUsers.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color: var(--text-muted);">Leaderboard empty.</td></tr>`;
-            return;
-        }
+        if(topUsers.length === 0) { tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;">Leaderboard empty.</td></tr>`; return; }
 
         topUsers.forEach((u, index) => {
             const rank = index + 1;
             const name = (u.profile && u.profile.name) ? u.profile.name : 'Unknown User';
-            
             let rankHtml = `<div class="rank-badge">${rank}</div>`;
             if(rank === 1) rankHtml = `<div class="rank-badge rank-1"><i class="fa-solid fa-crown"></i></div>`;
             else if(rank === 2) rankHtml = `<div class="rank-badge rank-2">2</div>`;
             else if(rank === 3) rankHtml = `<div class="rank-badge rank-3">3</div>`;
 
             const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td data-label="Rank">${rankHtml}</td>
-                <td data-label="User Name"><span style="font-weight: 600; color: white; font-size: 1.1rem;">${name}</span></td>
-                <td data-label="User ID"><span style="font-size: 0.8rem; color: var(--text-muted);">${u.id}</span></td>
-                <td data-label="Total Coins"><span style="color: gold; font-weight: bold; font-size: 1.2rem;"><i class="fa-solid fa-coins"></i> ${(u.coins || 0).toLocaleString()}</span></td>
-            `;
+            tr.innerHTML = `<td data-label="Rank">${rankHtml}</td><td data-label="User Name"><span style="font-weight: 600; color: white; font-size: 1.1rem;">${name}</span></td><td data-label="User ID"><span style="font-size: 0.8rem; color: var(--text-muted);">${u.id}</span></td><td data-label="Total Coins"><span style="color: gold; font-weight: bold; font-size: 1.2rem;"><i class="fa-solid fa-coins"></i> ${(u.coins || 0).toLocaleString()}</span></td>`;
             tbody.appendChild(tr);
         });
     }
 
-    // 🔥 OPEN MODAL WITH ADVANCED TRACKING 🔥
+    // 🔥 OPEN MODAL WITH ADVANCED TRACKING & ACTIONS 🔥
     window.openUserModal = (userId) => {
         const user = allUsers.find(u => u.id === userId); if(!user) return;
-        
+        currentOpenUserId = userId; // Set global track
+
         document.getElementById('modal-user-name').innerText = user.profile?.name || 'Unknown User';
         document.getElementById('modal-user-id').innerText = `ID: ${user.id} | Ref Code: ${user.refCode || 'N/A'}`;
         document.getElementById('modal-user-coins').innerHTML = `<i class="fa-solid fa-coins"></i> ${(user.coins || 0).toLocaleString()}`;
         
-        // Compute Advanced Stats
+        // Show Block Status
+        const blockBadge = document.getElementById('modal-block-status');
+        const blockBtn = document.getElementById('btn-block');
+        if(user.isBlocked) {
+            blockBadge.style.display = 'inline-block';
+            blockBtn.innerHTML = '<i class="fa-solid fa-unlock"></i> Unblock User';
+            blockBtn.classList.replace('btn-danger', 'btn-info');
+        } else {
+            blockBadge.style.display = 'none';
+            blockBtn.innerHTML = '<i class="fa-solid fa-ban"></i> Block User';
+            blockBtn.classList.replace('btn-info', 'btn-danger');
+        }
+
         const ageMs = Date.now() - getSafeMs(user.createdAt);
         const ageDays = Math.floor(ageMs / (1000 * 60 * 60 * 24));
         document.getElementById('modal-age').innerText = `${ageDays} Days`;
-        
         document.getElementById('modal-device').innerText = user.deviceId || "Not Tracked";
         document.getElementById('modal-fb').innerText = (user.tasks && user.tasks.lastFbId) ? user.tasks.lastFbId : "Not Provided";
         document.getElementById('modal-insta').innerText = (user.tasks && user.tasks.lastInstaId) ? user.tasks.lastInstaId : "Not Provided";
         
-        let taskCount = 0;
-        let lastActive = "Never";
-
+        let taskCount = 0; let lastActive = "Never";
         const txList = document.getElementById('modal-tx-list'); txList.innerHTML = '';
         
         if(user.transactions && Array.isArray(user.transactions) && user.transactions.length > 0) {
             const sortedTx = [...user.transactions].sort((a,b) => getSafeMs(b.date) - getSafeMs(a.date));
-            
             taskCount = sortedTx.filter(t => t.type === 'earn' && t.title !== 'Admin Adjustment').length;
             lastActive = formatFullTime(sortedTx[0].date);
 
             sortedTx.forEach(t => {
                 txList.innerHTML += `<div class="history-item"><div class="h-info"><span class="h-title">${t.title}</span><span class="h-time" style="font-weight:600; color:white;">${formatFullTime(t.date)}</span></div><div class="h-amt ${t.type === 'earn' ? 'text-green' : 'text-danger'}">${t.type === 'earn' ? '+' : '-'}${t.amount}</div></div>`;
             });
-        } else {
-            txList.innerHTML = `<p style="text-align:center; color:var(--text-muted); padding:20px;">No transaction history found for this user.</p>`;
-        }
+        } else { txList.innerHTML = `<p style="text-align:center; color:var(--text-muted); padding:20px;">No transaction history found.</p>`; }
 
         document.getElementById('modal-tasks-done').innerText = taskCount;
         document.getElementById('modal-last-active').innerText = lastActive;
@@ -550,7 +547,59 @@
         document.getElementById('user-modal').style.display = 'flex';
     }
 
-    window.closeUserModal = () => { document.getElementById('user-modal').style.display = 'none'; }
+    window.closeUserModal = () => { 
+        document.getElementById('user-modal').style.display = 'none'; 
+        currentOpenUserId = null;
+    }
+
+    // 🔥 NEW: TOGGLE BLOCK USER 🔥
+    window.toggleBlockUser = async () => {
+        if(!currentOpenUserId) return;
+        const userIndex = allUsers.findIndex(u => u.id === currentOpenUserId);
+        if(userIndex === -1) return;
+        
+        const isCurrentlyBlocked = allUsers[userIndex].isBlocked || false;
+        const newStatus = !isCurrentlyBlocked;
+        const actionWord = newStatus ? "BLOCK" : "UNBLOCK";
+
+        if(!confirm(`Are you sure you want to ${actionWord} this user?`)) return;
+
+        try {
+            await updateDoc(doc(db, "earnx_users", currentOpenUserId), { isBlocked: newStatus });
+            allUsers[userIndex].isBlocked = newStatus;
+            
+            window.showToast(`User successfully ${actionWord}ED!`);
+            window.openUserModal(currentOpenUserId); // Refresh Modal UI
+            window.refreshActiveTab(); // Refresh Table UI
+        } catch(e) {
+            window.showToast("Error updating status", true);
+        }
+    }
+
+    // 🔥 NEW: SEND PERSONAL ALERT 🔥
+    window.sendPersonalAlert = async () => {
+        if(!currentOpenUserId) return;
+        
+        const alertMsg = prompt("Enter a Warning/Alert message for this user.\n(It will popup next time they open the app):");
+        if(alertMsg === null || alertMsg.trim() === "") return;
+
+        try {
+            await updateDoc(doc(db, "earnx_users", currentOpenUserId), { personalAlert: alertMsg.trim() });
+            window.showToast("Personal Alert Sent Successfully!");
+            // Automatically log an admin note in their history so you have a record
+            const user = allUsers.find(u => u.id === currentOpenUserId);
+            if(user) {
+                let txs = Array.isArray(user.transactions) ? user.transactions : [];
+                txs.unshift({ title: "Admin Warning Sent", amount: 0, type: "spend", date: Date.now() });
+                if(txs.length > 50) txs.pop();
+                await updateDoc(doc(db, "earnx_users", currentOpenUserId), { transactions: txs });
+                user.transactions = txs;
+                window.openUserModal(currentOpenUserId); // Refresh modal to show note
+            }
+        } catch(e) {
+            window.showToast("Error sending alert", true);
+        }
+    }
 
     window.editUserBalance = async (userId, currentCoins) => {
         const val = prompt(`Current Balance: ${currentCoins} Coins\n\nEnter amount to ADD (e.g. 50000) or DEDUCT (e.g. -10000):`);
@@ -570,37 +619,22 @@
             
             if(userSnap.exists()) {
                 const userData = userSnap.data();
-                
                 let txs = Array.isArray(userData.transactions) ? userData.transactions : [];
                 const txType = amount > 0 ? "earn" : "spend";
-                
-                const newTx = { 
-                    title: "Admin Adjustment", 
-                    amount: Math.abs(amount), 
-                    type: txType, 
-                    date: Date.now() 
-                };
+                const newTx = { title: "Admin Adjustment", amount: Math.abs(amount), type: txType, date: Date.now() };
 
                 txs.unshift(newTx);
                 if(txs.length > 50) txs.pop();
                 
-                await updateDoc(userRef, { 
-                    coins: newBalance, 
-                    transactions: txs 
-                });
+                await updateDoc(userRef, { coins: newBalance, transactions: txs });
                 
                 const localUser = allUsers.find(u => u.id === userId);
-                if(localUser) {
-                    localUser.coins = newBalance;
-                    localUser.transactions = txs;
-                }
+                if(localUser) { localUser.coins = newBalance; localUser.transactions = txs; }
                 
                 window.showToast("Balance Updated Successfully!");
                 window.refreshActiveTab(); 
             }
-        } catch(e) {
-            window.showToast("Error updating balance", true);
-        }
+        } catch(e) { window.showToast("Error updating balance", true); }
     }
 
     window.approveReq = async (docId) => {
