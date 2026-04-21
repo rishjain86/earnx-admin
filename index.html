@@ -94,6 +94,10 @@
         .rank-2 { background: silver; color: black; border-color: silver; }
         .rank-3 { background: #cd7f32; color: white; border-color: #cd7f32; }
 
+        /* NOTICE SECTION INPUTS */
+        .notice-input { width: 100%; padding: 15px; margin-bottom: 20px; border-radius: 10px; background: var(--bg-darker); border: 1px solid var(--card-border); color: white; font-family: 'Inter', sans-serif; font-size: 1rem; outline: none; }
+        .notice-input:focus { border-color: var(--primary); }
+
         @media screen and (max-width: 768px) {
             .header { flex-direction: column; align-items: flex-start; gap: 15px; }
             .header .btn { width: auto; align-self: flex-start; }
@@ -171,6 +175,8 @@
             <div class="tab" onclick="switchTab('withdraw-history')" id="tab-withdraw-history">History</div>
             <div class="tab" onclick="switchTab('users')" id="tab-users">All Users</div>
             <div class="tab" onclick="switchTab('leaderboard')" id="tab-leaderboard">Leaderboard</div>
+            <div class="tab" onclick="switchTab('notice')" id="tab-notice" style="border: 1px solid var(--warning); color: var(--warning);">Flash Notice</div>
+            
             <button class="btn btn-small" style="margin-left: auto; background: var(--bg-dark); border: 1px solid var(--card-border);" onclick="loadDashboardData()">Refresh</button>
         </div>
 
@@ -222,12 +228,29 @@
             </table>
         </div>
 
+        <div class="table-container" id="sec-notice" style="background: var(--card-bg); padding: 30px; border-radius: 16px;">
+            <h2 style="color: var(--warning); margin-bottom: 10px;"><i class="fa-solid fa-bullhorn"></i> Send Global App Notice</h2>
+            <p style="color: var(--text-muted); margin-bottom: 25px;">Turn this ON to show a popup message to all users when they open the EarnX app.</p>
+            
+            <label style="display:block; margin-bottom:10px; font-weight:bold; color: white;">Notice Status:</label>
+            <select id="notice-status" class="notice-input">
+                <option value="false">🔴 OFF (Users ko nahi dikhega)</option>
+                <option value="true">🟢 ON (Users ko popup dikhega)</option>
+            </select>
+
+            <label style="display:block; margin-bottom:10px; font-weight:bold; color: white;">Message Content:</label>
+            <textarea id="notice-msg" class="notice-input" rows="4" style="resize: vertical;" placeholder="Type your message here (e.g., 'Server maintenance is going on' or 'Claim 50 Bonus Coins Today!')"></textarea>
+            
+            <button class="btn btn-warning" onclick="saveNotice()" style="font-size: 1.1rem; padding: 15px;"><i class="fa-solid fa-paper-plane"></i> Update Global Notice</button>
+        </div>
+
     </div>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/12.12.0/firebase-app.js";
     import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.12.0/firebase-auth.js";
-    import { getFirestore, collection, getDocs, updateDoc, doc, getDoc } from "https://www.gstatic.com/firebasejs/12.12.0/firebase-firestore.js";
+    // 🔥 Added setDoc here 🔥
+    import { getFirestore, collection, getDocs, updateDoc, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/12.12.0/firebase-firestore.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyCpS_rr77wh23C2LYl6xCSTyptMKlITauk",
@@ -247,7 +270,6 @@
     let allUsers = [];
     let currentTab = 'withdraw-pending';
 
-    // Time Formatting to IST
     const formatFullTime = (timestamp) => {
         if (!timestamp) return 'Unknown';
         const dateObj = new Date(typeof timestamp === 'number' ? timestamp : timestamp.seconds * 1000);
@@ -258,7 +280,6 @@
         }) + " IST";
     };
 
-    // Safe timestamp getter for Sorting
     const getSafeMs = (timestamp) => {
         if (!timestamp) return 0;
         return typeof timestamp === 'number' ? timestamp : (timestamp.seconds * 1000);
@@ -312,19 +333,57 @@
             allWithdrawals.sort((a,b) => getSafeMs(b.createdAt) - getSafeMs(a.createdAt));
             document.getElementById('stat-pending').innerText = pendingCount;
             document.getElementById('stat-paid').innerText = `₹${(totalPaidCoins / 10000) * 100}`;
+            
+            // 🔥 Load Notice Data 🔥
+            const noticeSnap = await getDoc(doc(db, "earnx_settings", "app_notice"));
+            if(noticeSnap.exists()) {
+                document.getElementById('notice-status').value = noticeSnap.data().isActive ? "true" : "false";
+                document.getElementById('notice-msg').value = noticeSnap.data().message || "";
+            }
+
             window.refreshActiveTab();
         } catch (e) { window.showToast("Error loading data", true); }
         document.getElementById('main-loader').style.display = 'none';
     }
 
+    // 🔥 SAVE NOTICE LOGIC 🔥
+    window.saveNotice = async () => {
+        const status = document.getElementById('notice-status').value === "true";
+        const msg = document.getElementById('notice-msg').value.trim();
+
+        if (status && msg === "") {
+            window.showToast("Please enter a message to display!", true);
+            return;
+        }
+
+        try {
+            await setDoc(doc(db, "earnx_settings", "app_notice"), {
+                isActive: status,
+                message: msg,
+                updatedAt: Date.now()
+            });
+            window.showToast("Global Notice Updated Successfully!");
+        } catch (error) {
+            window.showToast("Error saving notice!", true);
+        }
+    };
+
     window.switchTab = (tab) => {
         currentTab = tab;
         document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
         document.getElementById(`tab-${tab}`).classList.add('active');
+        
         document.querySelectorAll('.table-container').forEach(c => c.classList.remove('active'));
+        document.getElementById('sec-notice').style.display = 'none'; // hide notice explicitly
+        
         if(tab.startsWith('withdraw')) document.getElementById('sec-withdrawals').classList.add('active');
         else if (tab === 'users') document.getElementById('sec-users').classList.add('active');
         else if (tab === 'leaderboard') document.getElementById('sec-leaderboard').classList.add('active');
+        else if (tab === 'notice') {
+            document.getElementById('sec-notice').style.display = 'block';
+            document.getElementById('sec-notice').classList.add('active');
+        }
+        
         window.refreshActiveTab();
     }
 
@@ -421,7 +480,6 @@
 
     window.closeUserModal = () => { document.getElementById('user-modal').style.display = 'none'; }
 
-    // 🔥 INSTANT UPDATE LOGIC 🔥
     window.editUserBalance = async (userId, currentCoins) => {
         const val = prompt(`Current Balance: ${currentCoins} Coins\n\nEnter amount to ADD (e.g. 50000) or DEDUCT (e.g. -10000):`);
         if(val === null || val.trim() === "") return;
@@ -441,12 +499,9 @@
             if(userSnap.exists()) {
                 const userData = userSnap.data();
                 
-                // Safe check taaki error na aaye
                 let txs = Array.isArray(userData.transactions) ? userData.transactions : [];
-                
                 const txType = amount > 0 ? "earn" : "spend";
                 
-                // Nayi Entry Banayi
                 const newTx = { 
                     title: "Admin Adjustment", 
                     amount: Math.abs(amount), 
@@ -457,13 +512,11 @@
                 txs.unshift(newTx);
                 if(txs.length > 50) txs.pop();
                 
-                // Firebase me update kiya
                 await updateDoc(userRef, { 
                     coins: newBalance, 
                     transactions: txs 
                 });
                 
-                // ⚡ JADOO: Bina reload kiye memory mein update kar diya!
                 const localUser = allUsers.find(u => u.id === userId);
                 if(localUser) {
                     localUser.coins = newBalance;
@@ -471,7 +524,7 @@
                 }
                 
                 window.showToast("Balance Updated Successfully!");
-                window.refreshActiveTab(); // Table turant update ho jayegi
+                window.refreshActiveTab(); 
             }
         } catch(e) {
             window.showToast("Error updating balance", true);
