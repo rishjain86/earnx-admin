@@ -144,6 +144,13 @@
                 <span id="modal-user-coins" style="font-size: 1.5rem; font-weight: bold; color: gold;"><i class="fa-solid fa-coins"></i> 0</span>
             </div>
 
+            <div style="background: var(--bg-dark); padding: 15px; border-radius: 10px; border: 1px solid var(--card-border); margin-bottom: 20px;">
+                <h3 style="font-size: 0.9rem; color: var(--info); margin-bottom: 10px;"><i class="fa-solid fa-user-pen"></i> Admin Profile Edit</h3>
+                <input type="text" id="admin-edit-name" placeholder="Full Name" style="width: 100%; padding: 10px; margin-bottom: 10px; border-radius: 6px; background: var(--bg-darker); border: 1px solid var(--card-border); color: white; outline: none;">
+                <input type="text" id="admin-edit-phone" placeholder="Phone/UPI Number" style="width: 100%; padding: 10px; margin-bottom: 10px; border-radius: 6px; background: var(--bg-darker); border: 1px solid var(--card-border); color: white; outline: none;">
+                <button class="btn btn-info btn-small" onclick="adminSaveProfile()"><i class="fa-solid fa-floppy-disk"></i> Force Save Profile</button>
+            </div>
+
             <div class="user-stats-grid">
                 <div class="user-stat-box"><span>Account Age</span><b id="modal-age">...</b></div>
                 <div class="user-stat-box highlight"><span>Device ID (Bot Check)</span><b id="modal-device" style="color: var(--warning);">...</b></div>
@@ -478,11 +485,10 @@
         });
     }
 
-    // 🔥 UPDATED LEADERBOARD FUNCTION FOR LIFETIME COINS 🔥
     function renderLeaderboard() {
         const tbody = document.getElementById('tbody-leaderboard'); tbody.innerHTML = '';
 
-        // Step 1: Calculate withdrawn coins for each user
+        // Calculate withdrawn coins for each user
         let withdrawTotals = {};
         allWithdrawals.forEach(w => {
             if(w.status === "Pending" || w.status === "Approved") {
@@ -493,7 +499,7 @@
             }
         });
 
-        // Step 2: Map users, calculate lifetime coins, filter blocked users and 0 earners
+        // Map users, calculate lifetime coins, filter blocked users and 0 earners
         let usersWithLifetime = allUsers
             .filter(u => !u.isBlocked)
             .map(u => {
@@ -504,9 +510,9 @@
                     lifetimeCoins: currentCoins + withdrawnCoins
                 };
             })
-            .filter(u => u.lifetimeCoins > 0); // Only show if they earned something
+            .filter(u => u.lifetimeCoins > 0);
 
-        // Step 3: Sort descending and get top 50
+        // Sort descending and get top 50
         const sortedUsers = usersWithLifetime.sort((a,b) => b.lifetimeCoins - a.lifetimeCoins);
         const topUsers = sortedUsers.slice(0, 50);
 
@@ -529,12 +535,16 @@
     // 🔥 OPEN MODAL WITH ADVANCED TRACKING & ACTIONS 🔥
     window.openUserModal = (userId) => {
         const user = allUsers.find(u => u.id === userId); if(!user) return;
-        currentOpenUserId = userId; // Set global track
+        currentOpenUserId = userId; 
 
         document.getElementById('modal-user-name').innerText = user.profile?.name || 'Unknown User';
         document.getElementById('modal-user-id').innerText = `ID: ${user.id} | Ref Code: ${user.refCode || 'N/A'}`;
         document.getElementById('modal-user-coins').innerHTML = `<i class="fa-solid fa-coins"></i> ${(user.coins || 0).toLocaleString()}`;
         
+        // 🔥 Pre-fill Edit Profile Inputs 🔥
+        document.getElementById('admin-edit-name').value = user.profile?.name || '';
+        document.getElementById('admin-edit-phone').value = user.profile?.phone || '';
+
         // Show Block Status
         const blockBadge = document.getElementById('modal-block-status');
         const blockBtn = document.getElementById('btn-block');
@@ -579,7 +589,38 @@
         currentOpenUserId = null;
     }
 
-    // 🔥 NEW: TOGGLE BLOCK USER 🔥
+    // 🔥 NEW: ADMIN SAVE PROFILE DETAILS 🔥
+    window.adminSaveProfile = async () => {
+        if(!currentOpenUserId) return;
+        
+        const newName = document.getElementById('admin-edit-name').value.trim();
+        const newPhone = document.getElementById('admin-edit-phone').value.trim();
+
+        if(!confirm("Are you sure you want to change this user's profile details?")) return;
+
+        try {
+            await updateDoc(doc(db, "earnx_users", currentOpenUserId), { 
+                "profile.name": newName,
+                "profile.phone": newPhone
+            });
+            
+            // Update local array so UI updates instantly without reloading
+            const userIndex = allUsers.findIndex(u => u.id === currentOpenUserId);
+            if(userIndex !== -1) {
+                if(!allUsers[userIndex].profile) allUsers[userIndex].profile = {};
+                allUsers[userIndex].profile.name = newName;
+                allUsers[userIndex].profile.phone = newPhone;
+            }
+
+            document.getElementById('modal-user-name').innerText = newName || 'Unknown User';
+            window.showToast("Profile Updated Successfully!");
+            window.refreshActiveTab(); // Refresh the table behind the modal
+
+        } catch(e) {
+            window.showToast("Error updating profile", true);
+        }
+    }
+
     window.toggleBlockUser = async () => {
         if(!currentOpenUserId) return;
         const userIndex = allUsers.findIndex(u => u.id === currentOpenUserId);
@@ -603,7 +644,6 @@
         }
     }
 
-    // 🔥 NEW: SEND PERSONAL ALERT 🔥
     window.sendPersonalAlert = async () => {
         if(!currentOpenUserId) return;
         
@@ -613,7 +653,6 @@
         try {
             await updateDoc(doc(db, "earnx_users", currentOpenUserId), { personalAlert: alertMsg.trim() });
             window.showToast("Personal Alert Sent Successfully!");
-            // Automatically log an admin note in their history so you have a record
             const user = allUsers.find(u => u.id === currentOpenUserId);
             if(user) {
                 let txs = Array.isArray(user.transactions) ? user.transactions : [];
