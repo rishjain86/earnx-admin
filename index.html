@@ -249,7 +249,7 @@
                         <th style="width: 80px;">Rank</th>
                         <th>User Name</th>
                         <th>User ID</th>
-                        <th>Total Coins</th>
+                        <th>Total Lifetime Coins</th>
                     </tr>
                 </thead>
                 <tbody id="tbody-leaderboard"></tbody>
@@ -478,9 +478,36 @@
         });
     }
 
+    // 🔥 UPDATED LEADERBOARD FUNCTION FOR LIFETIME COINS 🔥
     function renderLeaderboard() {
         const tbody = document.getElementById('tbody-leaderboard'); tbody.innerHTML = '';
-        const sortedUsers = [...allUsers].sort((a,b) => (b.coins || 0) - (a.coins || 0)).filter(u => !u.isBlocked); // Exclude blocked users from leaderboard
+
+        // Step 1: Calculate withdrawn coins for each user
+        let withdrawTotals = {};
+        allWithdrawals.forEach(w => {
+            if(w.status === "Pending" || w.status === "Approved") {
+                if(!withdrawTotals[w.userId]) {
+                    withdrawTotals[w.userId] = 0;
+                }
+                withdrawTotals[w.userId] += Number(w.coins);
+            }
+        });
+
+        // Step 2: Map users, calculate lifetime coins, filter blocked users and 0 earners
+        let usersWithLifetime = allUsers
+            .filter(u => !u.isBlocked)
+            .map(u => {
+                let currentCoins = Number(u.coins) || 0;
+                let withdrawnCoins = withdrawTotals[u.id] || 0;
+                return {
+                    ...u,
+                    lifetimeCoins: currentCoins + withdrawnCoins
+                };
+            })
+            .filter(u => u.lifetimeCoins > 0); // Only show if they earned something
+
+        // Step 3: Sort descending and get top 50
+        const sortedUsers = usersWithLifetime.sort((a,b) => b.lifetimeCoins - a.lifetimeCoins);
         const topUsers = sortedUsers.slice(0, 50);
 
         if(topUsers.length === 0) { tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;">Leaderboard empty.</td></tr>`; return; }
@@ -494,7 +521,7 @@
             else if(rank === 3) rankHtml = `<div class="rank-badge rank-3">3</div>`;
 
             const tr = document.createElement('tr');
-            tr.innerHTML = `<td data-label="Rank">${rankHtml}</td><td data-label="User Name"><span style="font-weight: 600; color: white; font-size: 1.1rem;">${name}</span></td><td data-label="User ID"><span style="font-size: 0.8rem; color: var(--text-muted);">${u.id}</span></td><td data-label="Total Coins"><span style="color: gold; font-weight: bold; font-size: 1.2rem;"><i class="fa-solid fa-coins"></i> ${(u.coins || 0).toLocaleString()}</span></td>`;
+            tr.innerHTML = `<td data-label="Rank">${rankHtml}</td><td data-label="User Name"><span style="font-weight: 600; color: white; font-size: 1.1rem;">${name}</span></td><td data-label="User ID"><span style="font-size: 0.8rem; color: var(--text-muted);">${u.id}</span></td><td data-label="Total Lifetime Coins"><span style="color: gold; font-weight: bold; font-size: 1.2rem;"><i class="fa-solid fa-coins"></i> ${(u.lifetimeCoins).toLocaleString()}</span></td>`;
             tbody.appendChild(tr);
         });
     }
