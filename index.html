@@ -153,11 +153,11 @@
 
             <div class="user-stats-grid">
                 <div class="user-stat-box"><span>Account Age</span><b id="modal-age">...</b></div>
+                <div class="user-stat-box" style="border-color: var(--primary);"><span>Referred By</span><b id="modal-referred-by">...</b></div>
                 <div class="user-stat-box highlight"><span>Device ID (Bot Check)</span><b id="modal-device" style="color: var(--warning);">...</b></div>
                 <div class="user-stat-box" style="border-color: #3b82f6;"><span>FB Task ID</span><b id="modal-fb">...</b></div>
                 <div class="user-stat-box" style="border-color: #ec4899;"><span>Insta Task ID</span><b id="modal-insta">...</b></div>
                 <div class="user-stat-box"><span>Total Tasks Done</span><b id="modal-tasks-done">...</b></div>
-                <div class="user-stat-box"><span>Last Active Date</span><b id="modal-last-active">...</b></div>
             </div>
 
             <h3 style="margin-top: 10px; margin-bottom: 10px; font-size: 1.1rem; border-bottom: 1px solid var(--card-border); padding-bottom: 10px;">Full Activity Log</h3>
@@ -233,8 +233,20 @@
             </table>
         </div>
 
-        <div class="table-container" id="sec-users">
-            <table>
+        <div class="table-container" id="sec-users" style="padding: 20px;">
+            
+            <div style="background-color: rgba(239, 68, 68, 0.1); padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px dashed var(--danger);">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                    <div>
+                        <h3 style="margin-top: 0; color: var(--danger); font-size: 1.1rem;"><i class="fa-solid fa-user-ninja"></i> Fake Account Detector</h3>
+                        <p style="color: var(--text-muted); font-size: 0.85rem;">Find multiple accounts created from the same mobile device.</p>
+                    </div>
+                    <button onclick="findFakeUsers()" class="btn btn-danger btn-small"><i class="fa-solid fa-magnifying-glass"></i> Scan For Fakes</button>
+                </div>
+                <div id="fakeAlertBox" style="margin-top: 15px; font-size: 0.9rem;"></div>
+            </div>
+
+            <table style="margin-top: 10px;">
                 <thead>
                     <tr>
                         <th>Account Info</th>
@@ -321,7 +333,7 @@
     let allWithdrawals = [];
     let allUsers = [];
     let currentTab = 'withdraw-pending';
-    let currentOpenUserId = null; // Track currently open user in modal
+    let currentOpenUserId = null; 
 
     const formatFullTime = (timestamp) => {
         if (!timestamp) return 'Unknown';
@@ -469,13 +481,21 @@
             const ageMs = Date.now() - getSafeMs(u.createdAt);
             const ageDays = Math.floor(ageMs / (1000 * 60 * 60 * 24));
             
-            // Show if user is blocked in the table
             let statusBadge = u.isBlocked ? `<span class="badge badge-rejected">BLOCKED</span>` : `<span class="badge badge-approved">ACTIVE</span>`;
+
+            // 🔥 LOGIC FOR REFERRED BY IN TABLE (NEW) 🔥
+            let appliedCode = u.referredBy || u.appliedRefCode || u.invitedBy;
+            let refTextForTable = "";
+            if(appliedCode && appliedCode !== "None" && appliedCode !== "") {
+                let referrerObj = allUsers.find(x => x.refCode === appliedCode);
+                let refName = referrerObj ? (referrerObj.profile?.name || 'Unknown User') : 'Unknown';
+                refTextForTable = `<br><span style="font-size: 0.75rem; color: var(--primary);"><i class="fa-solid fa-user-plus"></i> Ref by: ${refName}</span>`;
+            }
 
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td data-label="Account Info"><span style="font-size: 0.8rem; font-weight: 600; color: #10b981;">Joined: ${ageDays} days ago</span><br><span style="font-size: 0.7rem; color: var(--text-muted);">${formatFullTime(u.createdAt)}</span></td>
-                <td data-label="User Info">${u.profile?.name || 'Unknown'} <br><span style="font-size: 0.75rem; color: var(--text-muted);">ID: ${u.id.substring(0,8)}...</span></td>
+                <td data-label="User Info">${u.profile?.name || 'Unknown'} <br><span style="font-size: 0.75rem; color: var(--text-muted);">ID: ${u.id.substring(0,8)}...</span> ${refTextForTable}</td>
                 <td data-label="Contact">${u.profile?.phone || u.phone}</td>
                 <td data-label="Balance"><span style="color: gold; font-weight: bold;"><i class="fa-solid fa-coins"></i> ${(u.coins || 0).toLocaleString()}</span></td>
                 <td data-label="Status">${statusBadge}</td>
@@ -488,7 +508,6 @@
     function renderLeaderboard() {
         const tbody = document.getElementById('tbody-leaderboard'); tbody.innerHTML = '';
 
-        // Calculate withdrawn coins for each user
         let withdrawTotals = {};
         allWithdrawals.forEach(w => {
             if(w.status === "Pending" || w.status === "Approved") {
@@ -499,7 +518,6 @@
             }
         });
 
-        // Map users, calculate lifetime coins, filter blocked users and 0 earners
         let usersWithLifetime = allUsers
             .filter(u => !u.isBlocked)
             .map(u => {
@@ -512,7 +530,6 @@
             })
             .filter(u => u.lifetimeCoins > 0);
 
-        // Sort descending and get top 50
         const sortedUsers = usersWithLifetime.sort((a,b) => b.lifetimeCoins - a.lifetimeCoins);
         const topUsers = sortedUsers.slice(0, 50);
 
@@ -532,7 +549,6 @@
         });
     }
 
-    // 🔥 OPEN MODAL WITH ADVANCED TRACKING & ACTIONS 🔥
     window.openUserModal = (userId) => {
         const user = allUsers.find(u => u.id === userId); if(!user) return;
         currentOpenUserId = userId; 
@@ -541,11 +557,9 @@
         document.getElementById('modal-user-id').innerText = `ID: ${user.id} | Ref Code: ${user.refCode || 'N/A'}`;
         document.getElementById('modal-user-coins').innerHTML = `<i class="fa-solid fa-coins"></i> ${(user.coins || 0).toLocaleString()}`;
         
-        // 🔥 Pre-fill Edit Profile Inputs 🔥
         document.getElementById('admin-edit-name').value = user.profile?.name || '';
         document.getElementById('admin-edit-phone').value = user.profile?.phone || '';
 
-        // Show Block Status
         const blockBadge = document.getElementById('modal-block-status');
         const blockBtn = document.getElementById('btn-block');
         if(user.isBlocked) {
@@ -561,6 +575,17 @@
         const ageMs = Date.now() - getSafeMs(user.createdAt);
         const ageDays = Math.floor(ageMs / (1000 * 60 * 60 * 24));
         document.getElementById('modal-age').innerText = `${ageDays} Days`;
+        
+        // 🔥 LOGIC FOR REFERRED BY IN MODAL (NEW) 🔥
+        let appliedCode = user.referredBy || user.appliedRefCode || user.invitedBy;
+        if(appliedCode && appliedCode !== "None" && appliedCode !== "") {
+            let referrerObj = allUsers.find(x => x.refCode === appliedCode);
+            let refName = referrerObj ? (referrerObj.profile?.name || 'Unknown User') : 'Unknown User';
+            document.getElementById('modal-referred-by').innerHTML = `${refName} <br><span style="color:var(--text-muted); font-size: 0.75rem;">Code: ${appliedCode}</span>`;
+        } else {
+            document.getElementById('modal-referred-by').innerHTML = `<span style="color:var(--text-muted);">Direct Join (No Code)</span>`;
+        }
+        
         document.getElementById('modal-device').innerText = user.deviceId || "Not Tracked";
         document.getElementById('modal-fb').innerText = (user.tasks && user.tasks.lastFbId) ? user.tasks.lastFbId : "Not Provided";
         document.getElementById('modal-insta').innerText = (user.tasks && user.tasks.lastInstaId) ? user.tasks.lastInstaId : "Not Provided";
@@ -589,7 +614,6 @@
         currentOpenUserId = null;
     }
 
-    // 🔥 NEW: ADMIN SAVE PROFILE DETAILS 🔥
     window.adminSaveProfile = async () => {
         if(!currentOpenUserId) return;
         
@@ -604,7 +628,6 @@
                 "profile.phone": newPhone
             });
             
-            // Update local array so UI updates instantly without reloading
             const userIndex = allUsers.findIndex(u => u.id === currentOpenUserId);
             if(userIndex !== -1) {
                 if(!allUsers[userIndex].profile) allUsers[userIndex].profile = {};
@@ -614,7 +637,7 @@
 
             document.getElementById('modal-user-name').innerText = newName || 'Unknown User';
             window.showToast("Profile Updated Successfully!");
-            window.refreshActiveTab(); // Refresh the table behind the modal
+            window.refreshActiveTab(); 
 
         } catch(e) {
             window.showToast("Error updating profile", true);
@@ -637,8 +660,8 @@
             allUsers[userIndex].isBlocked = newStatus;
             
             window.showToast(`User successfully ${actionWord}ED!`);
-            window.openUserModal(currentOpenUserId); // Refresh Modal UI
-            window.refreshActiveTab(); // Refresh Table UI
+            window.openUserModal(currentOpenUserId); 
+            window.refreshActiveTab(); 
         } catch(e) {
             window.showToast("Error updating status", true);
         }
@@ -660,7 +683,7 @@
                 if(txs.length > 50) txs.pop();
                 await updateDoc(doc(db, "earnx_users", currentOpenUserId), { transactions: txs });
                 user.transactions = txs;
-                window.openUserModal(currentOpenUserId); // Refresh modal to show note
+                window.openUserModal(currentOpenUserId); 
             }
         } catch(e) {
             window.showToast("Error sending alert", true);
@@ -736,6 +759,51 @@
 
         } catch(e) { window.showToast("Error processing reject", true); }
     }
+
+    window.findFakeUsers = () => {
+        if (!allUsers || allUsers.length === 0) {
+            document.getElementById("fakeAlertBox").innerHTML = "<span style='color: var(--warning);'>⚠️ Please wait for user data to load first!</span>";
+            return;
+        }
+
+        let deviceCount = {};
+        let outputHTML = "<hr style='border-color: var(--card-border); margin: 15px 0;'><h4 style='color: var(--danger); margin-bottom: 10px;'>Fake Accounts Found (Same Device ID):</h4>";
+        let foundFake = false;
+
+        allUsers.forEach(user => {
+            let id = user.deviceId; 
+            
+            if(id && id.trim() !== "") { 
+                let userInfo = `<b>${user.profile?.name || 'Unknown'}</b> (Coins: ${user.coins || 0}) <br><span style='font-size:0.75rem; color:var(--text-muted);'>ID: ${user.id}</span>`;
+                
+                if(deviceCount[id]) {
+                    deviceCount[id].push(userInfo);
+                } else {
+                    deviceCount[id] = [userInfo];
+                }
+            }
+        });
+
+        for (let deviceId in deviceCount) {
+            if(deviceCount[deviceId].length > 1) {
+                foundFake = true;
+                outputHTML += `
+                <div style="background: var(--bg-dark); padding: 10px; border-left: 4px solid var(--danger); margin-bottom: 10px; border-radius: 4px;">
+                    <span style="color: var(--warning); font-size: 0.8rem; margin-bottom: 5px; display: block;"><i class="fa-solid fa-mobile-screen"></i> Device ID: ${deviceId}</span>
+                    <div style="margin-left: 10px; padding-left: 10px; border-left: 1px dashed var(--card-border);">
+                        👉 ${deviceCount[deviceId].join('<br><br> 👉 ')}
+                    </div>
+                </div>`;
+            }
+        }
+
+        if(!foundFake) {
+            outputHTML = "<p style='color: var(--primary); font-weight: bold;'><i class='fa-solid fa-circle-check'></i> All clean! No fake accounts detected.</p>";
+        }
+
+        document.getElementById("fakeAlertBox").innerHTML = outputHTML;
+    }
+
 </script>
 </body>
 </html>
