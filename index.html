@@ -74,7 +74,7 @@
 
         /* MODAL */
         #user-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 10000; justify-content: center; align-items: center; padding: 20px; }
-        .modal-content { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 16px; width: 100%; max-width: 600px; max-height: 85vh; overflow-y: auto; padding: 25px; box-shadow: 0 10px 40px rgba(0,0,0,0.6); position: relative; }
+        .modal-content { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 16px; width: 100%; max-width: 650px; max-height: 75vh; overflow-y: auto; padding: 25px; box-shadow: 0 10px 40px rgba(0,0,0,0.6); position: relative; }
         .close-btn { position: absolute; top: 20px; right: 20px; font-size: 1.5rem; color: var(--text-muted); cursor: pointer; transition: 0.2s; }
         
         .user-stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
@@ -120,7 +120,7 @@
             td:last-child { border-bottom: none; background: rgba(0,0,0,0.2); }
             td::before { content: attr(data-label); font-weight: 600; color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase; margin-right: 15px; text-align: left; }
             .action-btns { justify-content: flex-end; width: 100%; gap: 5px; }
-            .modal-content { padding: 20px 15px; width: 95%; max-height: 90vh; }
+            .modal-content { padding: 20px 15px; width: 98%; max-height: 75vh; }
         }
     </style>
 </head>
@@ -155,9 +155,10 @@
                 <div class="user-stat-box"><span>Account Age</span><b id="modal-age">...</b></div>
                 <div class="user-stat-box" style="border-color: var(--primary);"><span>Referred By</span><b id="modal-referred-by">...</b></div>
                 <div class="user-stat-box highlight"><span>Device ID (Bot Check)</span><b id="modal-device" style="color: var(--warning);">...</b></div>
+                <div class="user-stat-box" style="border-color: var(--info);"><span>Last Active Date</span><b id="modal-last-active">...</b></div>
                 <div class="user-stat-box" style="border-color: #3b82f6;"><span>FB Task ID</span><b id="modal-fb">...</b></div>
                 <div class="user-stat-box" style="border-color: #ec4899;"><span>Insta Task ID</span><b id="modal-insta">...</b></div>
-                <div class="user-stat-box"><span>Total Tasks Done</span><b id="modal-tasks-done">...</b></div>
+                <div class="user-stat-box" style="grid-column: span 2; border-color: var(--primary);"><span>Total Tasks Done</span><b id="modal-tasks-done">...</b></div>
             </div>
 
             <h3 style="margin-top: 10px; margin-bottom: 10px; font-size: 1.1rem; border-bottom: 1px solid var(--card-border); padding-bottom: 10px;">Full Activity Log</h3>
@@ -606,6 +607,8 @@
         } else { txList.innerHTML = `<p style="text-align:center; color:var(--text-muted); padding:20px;">No transaction history found.</p>`; }
 
         document.getElementById('modal-tasks-done').innerText = taskCount;
+        
+        // PICHHLI BAAR YE WALI LINE ERROR DE RAHI THI, AB FIX HAI! 🔥
         document.getElementById('modal-last-active').innerText = lastActive;
 
         document.getElementById('user-modal').style.display = 'flex';
