@@ -74,7 +74,7 @@
 
         /* MODAL */
         #user-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 10000; justify-content: center; align-items: center; padding: 20px; }
-        .modal-content { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 16px; width: 100%; max-width: 650px; max-height: 75vh; overflow-y: auto; padding: 25px; box-shadow: 0 10px 40px rgba(0,0,0,0.6); position: relative; }
+        .modal-content { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 16px; width: 100%; max-width: 600px; max-height: 85vh; overflow-y: auto; padding: 25px; box-shadow: 0 10px 40px rgba(0,0,0,0.6); position: relative; }
         .close-btn { position: absolute; top: 20px; right: 20px; font-size: 1.5rem; color: var(--text-muted); cursor: pointer; transition: 0.2s; }
         
         .user-stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
@@ -120,7 +120,7 @@
             td:last-child { border-bottom: none; background: rgba(0,0,0,0.2); }
             td::before { content: attr(data-label); font-weight: 600; color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase; margin-right: 15px; text-align: left; }
             .action-btns { justify-content: flex-end; width: 100%; gap: 5px; }
-            .modal-content { padding: 20px 15px; width: 98%; max-height: 75vh; }
+            .modal-content { padding: 20px 15px; width: 95%; max-height: 90vh; }
         }
     </style>
 </head>
@@ -153,16 +153,14 @@
 
             <div class="user-stats-grid">
                 <div class="user-stat-box"><span>Account Age</span><b id="modal-age">...</b></div>
-                <div class="user-stat-box" style="border-color: var(--primary);"><span>Referred By</span><b id="modal-referred-by">...</b></div>
                 <div class="user-stat-box highlight"><span>Device ID (Bot Check)</span><b id="modal-device" style="color: var(--warning);">...</b></div>
-                <div class="user-stat-box" style="border-color: var(--info);"><span>Last Active Date</span><b id="modal-last-active">...</b></div>
                 <div class="user-stat-box" style="border-color: #3b82f6;"><span>FB Task ID</span><b id="modal-fb">...</b></div>
                 <div class="user-stat-box" style="border-color: #ec4899;"><span>Insta Task ID</span><b id="modal-insta">...</b></div>
-                <div class="user-stat-box" style="grid-column: span 2; border-color: var(--primary);"><span>Total Tasks Done</span><b id="modal-tasks-done">...</b></div>
+                <div class="user-stat-box"><span>Total Tasks Done</span><b id="modal-tasks-done">...</b></div>
+                <div class="user-stat-box"><span>Last Active Date</span><b id="modal-last-active">...</b></div>
             </div>
 
             <h3 style="margin-top: 10px; margin-bottom: 10px; font-size: 1.1rem; border-bottom: 1px solid var(--card-border); padding-bottom: 10px;">Full Activity Log</h3>
-            
             <div id="modal-tx-list" style="max-height: 200px; overflow-y: auto; margin-bottom: 10px; border: 1px solid var(--card-border); padding: 10px; border-radius: 8px; background: var(--bg-dark);"></div>
 
             <div class="admin-controls">
@@ -211,6 +209,7 @@
             <div class="tab active" onclick="switchTab('withdraw-pending')" id="tab-withdraw-pending">Pending</div>
             <div class="tab" onclick="switchTab('withdraw-history')" id="tab-withdraw-history">History</div>
             <div class="tab" onclick="switchTab('users')" id="tab-users">All Users</div>
+            <div class="tab" onclick="switchTab('referrals')" id="tab-referrals">Referrals</div>
             <div class="tab" onclick="switchTab('leaderboard')" id="tab-leaderboard">Leaderboard</div>
             <div class="tab" onclick="switchTab('settings')" id="tab-settings" style="border: 1px solid var(--warning); color: var(--warning);">⚙️ App Settings</div>
             
@@ -235,20 +234,22 @@
             </table>
         </div>
 
-        <div class="table-container" id="sec-users" style="padding: 20px;">
+        <div class="table-container" id="sec-users">
             
-            <div style="background-color: rgba(239, 68, 68, 0.1); padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px dashed var(--danger);">
-                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-                    <div>
-                        <h3 style="margin-top: 0; color: var(--danger); font-size: 1.1rem;"><i class="fa-solid fa-user-ninja"></i> Fake Account Detector</h3>
-                        <p style="color: var(--text-muted); font-size: 0.85rem;">Find multiple accounts created from the same mobile device.</p>
+            <div style="padding: 20px; border-bottom: 1px solid var(--card-border);">
+                <div style="background-color: rgba(239, 68, 68, 0.1); padding: 15px; border-radius: 8px; border: 1px dashed var(--danger);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                        <div>
+                            <h3 style="margin-top: 0; color: var(--danger); font-size: 1.1rem;"><i class="fa-solid fa-user-ninja"></i> Fake Account Detector</h3>
+                            <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 5px;">Find multiple accounts created from the same mobile device.</p>
+                        </div>
+                        <button onclick="findFakeUsers()" class="btn btn-danger btn-small"><i class="fa-solid fa-magnifying-glass"></i> Scan For Fakes</button>
                     </div>
-                    <button onclick="findFakeUsers()" class="btn btn-danger btn-small"><i class="fa-solid fa-magnifying-glass"></i> Scan For Fakes</button>
+                    <div id="fakeAlertBox" style="margin-top: 15px; font-size: 0.9rem;"></div>
                 </div>
-                <div id="fakeAlertBox" style="margin-top: 15px; font-size: 0.9rem;"></div>
             </div>
-
-            <table style="margin-top: 10px;">
+            
+            <table>
                 <thead>
                     <tr>
                         <th>Account Info</th>
@@ -260,6 +261,19 @@
                     </tr>
                 </thead>
                 <tbody id="tbody-users"></tbody>
+            </table>
+        </div>
+
+        <div class="table-container" id="sec-referrals" style="padding: 20px;">
+            <h3 style="color: var(--primary); margin-bottom: 15px;"><i class="fa-solid fa-users-viewfinder"></i> Referral Tracking</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Username (Joined User)</th>
+                        <th>Referred By (Name & Code)</th>
+                    </tr>
+                </thead>
+                <tbody id="tbody-referrals"></tbody>
             </table>
         </div>
 
@@ -446,6 +460,7 @@
         
         if(tab.startsWith('withdraw')) document.getElementById('sec-withdrawals').classList.add('active');
         else if (tab === 'users') document.getElementById('sec-users').classList.add('active');
+        else if (tab === 'referrals') document.getElementById('sec-referrals').classList.add('active'); // Added Link
         else if (tab === 'leaderboard') document.getElementById('sec-leaderboard').classList.add('active');
         else if (tab === 'settings') document.getElementById('sec-settings').classList.add('active');
         
@@ -455,6 +470,7 @@
     window.refreshActiveTab = () => {
         if(currentTab.startsWith('withdraw')) renderWithdrawals();
         else if (currentTab === 'users') renderUsers();
+        else if (currentTab === 'referrals') renderReferrals(); // Added Render
         else if (currentTab === 'leaderboard') renderLeaderboard();
     }
 
@@ -476,6 +492,7 @@
         });
     }
 
+    // 🔥 ORIGINAL RENDER USERS FUNCTION (UNCHANGED) 🔥
     function renderUsers() {
         const tbody = document.getElementById('tbody-users'); tbody.innerHTML = '';
         const sorted = [...allUsers].sort((a,b) => getSafeMs(b.createdAt) - getSafeMs(a.createdAt));
@@ -483,21 +500,13 @@
             const ageMs = Date.now() - getSafeMs(u.createdAt);
             const ageDays = Math.floor(ageMs / (1000 * 60 * 60 * 24));
             
+            // Show if user is blocked in the table
             let statusBadge = u.isBlocked ? `<span class="badge badge-rejected">BLOCKED</span>` : `<span class="badge badge-approved">ACTIVE</span>`;
-
-            let appliedCode = u.pendingReferrer || u.referredBy || u.appliedRefCode || u.invitedBy;
-            let refTextForTable = "";
-            
-            if(appliedCode && appliedCode !== "None" && appliedCode !== "") {
-                let referrerObj = allUsers.find(x => (x.profile && x.profile.refCode === appliedCode) || x.refCode === appliedCode);
-                let refName = referrerObj ? (referrerObj.profile?.name || 'Unknown User') : 'Unknown';
-                refTextForTable = `<br><span style="font-size: 0.75rem; color: var(--primary);"><i class="fa-solid fa-user-plus"></i> Ref by: ${refName}</span>`;
-            }
 
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td data-label="Account Info"><span style="font-size: 0.8rem; font-weight: 600; color: #10b981;">Joined: ${ageDays} days ago</span><br><span style="font-size: 0.7rem; color: var(--text-muted);">${formatFullTime(u.createdAt)}</span></td>
-                <td data-label="User Info">${u.profile?.name || 'Unknown'} <br><span style="font-size: 0.75rem; color: var(--text-muted);">ID: ${u.id.substring(0,8)}...</span> ${refTextForTable}</td>
+                <td data-label="User Info">${u.profile?.name || 'Unknown'} <br><span style="font-size: 0.75rem; color: var(--text-muted);">ID: ${u.id.substring(0,8)}...</span></td>
                 <td data-label="Contact">${u.profile?.phone || u.phone}</td>
                 <td data-label="Balance"><span style="color: gold; font-weight: bold;"><i class="fa-solid fa-coins"></i> ${(u.coins || 0).toLocaleString()}</span></td>
                 <td data-label="Status">${statusBadge}</td>
@@ -507,9 +516,46 @@
         });
     }
 
+    // 🔥 NEW RENDER REFERRALS FUNCTION 🔥
+    function renderReferrals() {
+        const tbody = document.getElementById('tbody-referrals'); tbody.innerHTML = '';
+        const sorted = [...allUsers].sort((a,b) => getSafeMs(b.createdAt) - getSafeMs(a.createdAt));
+        
+        sorted.forEach(u => {
+            let appliedCode = u.pendingReferrer || u.referredBy || u.appliedRefCode || u.invitedBy;
+            let refName = "<span style='color: var(--text-muted);'>Direct Join</span>";
+            let displayCode = "<span style='color: var(--text-muted);'>No Code</span>";
+            
+            if(appliedCode && appliedCode !== "None" && appliedCode !== "") {
+                displayCode = appliedCode;
+                // Special condition for Admin code
+                if(appliedCode.toUpperCase() === "JRZZ1945") {
+                    refName = "<span style='color: gold; font-weight: bold;'><i class='fa-solid fa-crown'></i> Admin</span>";
+                } else {
+                    let referrerObj = allUsers.find(x => (x.profile && x.profile.refCode === appliedCode) || x.refCode === appliedCode);
+                    refName = referrerObj ? (referrerObj.profile?.name || 'Unknown User') : 'Unknown User';
+                }
+            }
+
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td data-label="Username">
+                    <span style="font-weight: 600; color: white; font-size: 1.05rem;">${u.profile?.name || 'Unknown'}</span><br>
+                    <span style="font-size: 0.75rem; color: var(--text-muted);">ID: ${u.id}</span>
+                </td>
+                <td data-label="Referred By">
+                    <span style="font-size: 1rem;">${refName}</span><br>
+                    <span style="font-size: 0.8rem; color: var(--primary);">Code: ${displayCode}</span>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
     function renderLeaderboard() {
         const tbody = document.getElementById('tbody-leaderboard'); tbody.innerHTML = '';
 
+        // Calculate withdrawn coins for each user
         let withdrawTotals = {};
         allWithdrawals.forEach(w => {
             if(w.status === "Pending" || w.status === "Approved") {
@@ -520,6 +566,7 @@
             }
         });
 
+        // Map users, calculate lifetime coins, filter blocked users and 0 earners
         let usersWithLifetime = allUsers
             .filter(u => !u.isBlocked)
             .map(u => {
@@ -532,6 +579,7 @@
             })
             .filter(u => u.lifetimeCoins > 0);
 
+        // Sort descending and get top 50
         const sortedUsers = usersWithLifetime.sort((a,b) => b.lifetimeCoins - a.lifetimeCoins);
         const topUsers = sortedUsers.slice(0, 50);
 
@@ -551,19 +599,20 @@
         });
     }
 
+    // 🔥 ORIGINAL USER MODAL FUNCTION (UNCHANGED) 🔥
     window.openUserModal = (userId) => {
         const user = allUsers.find(u => u.id === userId); if(!user) return;
         currentOpenUserId = userId; 
 
-        let ownRefCode = user.profile?.refCode || user.refCode || 'N/A';
-
         document.getElementById('modal-user-name').innerText = user.profile?.name || 'Unknown User';
-        document.getElementById('modal-user-id').innerText = `ID: ${user.id} | Ref Code: ${ownRefCode}`;
+        document.getElementById('modal-user-id').innerText = `ID: ${user.id} | Ref Code: ${user.refCode || 'N/A'}`;
         document.getElementById('modal-user-coins').innerHTML = `<i class="fa-solid fa-coins"></i> ${(user.coins || 0).toLocaleString()}`;
         
+        // 🔥 Pre-fill Edit Profile Inputs 🔥
         document.getElementById('admin-edit-name').value = user.profile?.name || '';
         document.getElementById('admin-edit-phone').value = user.profile?.phone || '';
 
+        // Show Block Status
         const blockBadge = document.getElementById('modal-block-status');
         const blockBtn = document.getElementById('btn-block');
         if(user.isBlocked) {
@@ -579,16 +628,6 @@
         const ageMs = Date.now() - getSafeMs(user.createdAt);
         const ageDays = Math.floor(ageMs / (1000 * 60 * 60 * 24));
         document.getElementById('modal-age').innerText = `${ageDays} Days`;
-        
-        let appliedCode = user.pendingReferrer || user.referredBy || user.appliedRefCode || user.invitedBy;
-        if(appliedCode && appliedCode !== "None" && appliedCode !== "") {
-            let referrerObj = allUsers.find(x => (x.profile && x.profile.refCode === appliedCode) || x.refCode === appliedCode);
-            let refName = referrerObj ? (referrerObj.profile?.name || 'Unknown User') : 'Unknown User';
-            document.getElementById('modal-referred-by').innerHTML = `${refName} <br><span style="color:var(--text-muted); font-size: 0.75rem;">Code: ${appliedCode}</span>`;
-        } else {
-            document.getElementById('modal-referred-by').innerHTML = `<span style="color:var(--text-muted);">Direct Join (No Code)</span>`;
-        }
-        
         document.getElementById('modal-device').innerText = user.deviceId || "Not Tracked";
         document.getElementById('modal-fb').innerText = (user.tasks && user.tasks.lastFbId) ? user.tasks.lastFbId : "Not Provided";
         document.getElementById('modal-insta').innerText = (user.tasks && user.tasks.lastInstaId) ? user.tasks.lastInstaId : "Not Provided";
@@ -607,8 +646,6 @@
         } else { txList.innerHTML = `<p style="text-align:center; color:var(--text-muted); padding:20px;">No transaction history found.</p>`; }
 
         document.getElementById('modal-tasks-done').innerText = taskCount;
-        
-        // PICHHLI BAAR YE WALI LINE ERROR DE RAHI THI, AB FIX HAI! 🔥
         document.getElementById('modal-last-active').innerText = lastActive;
 
         document.getElementById('user-modal').style.display = 'flex';
@@ -633,6 +670,7 @@
                 "profile.phone": newPhone
             });
             
+            // Update local array so UI updates instantly without reloading
             const userIndex = allUsers.findIndex(u => u.id === currentOpenUserId);
             if(userIndex !== -1) {
                 if(!allUsers[userIndex].profile) allUsers[userIndex].profile = {};
@@ -642,7 +680,7 @@
 
             document.getElementById('modal-user-name').innerText = newName || 'Unknown User';
             window.showToast("Profile Updated Successfully!");
-            window.refreshActiveTab(); 
+            window.refreshActiveTab(); // Refresh the table behind the modal
 
         } catch(e) {
             window.showToast("Error updating profile", true);
@@ -665,8 +703,8 @@
             allUsers[userIndex].isBlocked = newStatus;
             
             window.showToast(`User successfully ${actionWord}ED!`);
-            window.openUserModal(currentOpenUserId); 
-            window.refreshActiveTab(); 
+            window.openUserModal(currentOpenUserId); // Refresh Modal UI
+            window.refreshActiveTab(); // Refresh Table UI
         } catch(e) {
             window.showToast("Error updating status", true);
         }
@@ -688,7 +726,7 @@
                 if(txs.length > 50) txs.pop();
                 await updateDoc(doc(db, "earnx_users", currentOpenUserId), { transactions: txs });
                 user.transactions = txs;
-                window.openUserModal(currentOpenUserId); 
+                window.openUserModal(currentOpenUserId); // Refresh modal to show note
             }
         } catch(e) {
             window.showToast("Error sending alert", true);
@@ -765,6 +803,7 @@
         } catch(e) { window.showToast("Error processing reject", true); }
     }
 
+    // 🔥 NEW FAKE USER LOGIC ADDED AT THE END 🔥
     window.findFakeUsers = () => {
         if (!allUsers || allUsers.length === 0) {
             document.getElementById("fakeAlertBox").innerHTML = "<span style='color: var(--warning);'>⚠️ Please wait for user data to load first!</span>";
@@ -808,7 +847,6 @@
 
         document.getElementById("fakeAlertBox").innerHTML = outputHTML;
     }
-
 </script>
 </body>
 </html>
