@@ -509,6 +509,7 @@
         });
     }
 
+    // 🔥 FIX 1: Overriding JRZZ1945 in ALL USERS table 🔥
     function renderUsers() {
         const tbody = document.getElementById('tbody-users'); tbody.innerHTML = '';
         const sorted = [...allUsers].sort((a,b) => getSafeMs(b.createdAt) - getSafeMs(a.createdAt));
@@ -518,10 +519,24 @@
             
             let statusBadge = u.isBlocked ? `<span class="badge badge-rejected">BLOCKED</span>` : `<span class="badge badge-approved">ACTIVE</span>`;
 
+            let appliedCode = u.pendingReferrer || u.referredBy || u.appliedRefCode || u.invitedBy;
+            let refTextForTable = "";
+            
+            if(appliedCode && appliedCode !== "None" && appliedCode !== "") {
+                let refName = "";
+                if(appliedCode.toUpperCase() === "JRZZ1945") {
+                    refName = "Admin";
+                } else {
+                    let referrerObj = allUsers.find(x => x.id === appliedCode || (x.profile && x.profile.refCode === appliedCode) || x.refCode === appliedCode);
+                    refName = referrerObj ? (referrerObj.profile?.name || 'Unknown User') : 'Unknown';
+                }
+                refTextForTable = `<br><span style="font-size: 0.75rem; color: var(--primary);"><i class="fa-solid fa-user-plus"></i> Ref by: ${refName}</span>`;
+            }
+
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td data-label="Account Info"><span style="font-size: 0.8rem; font-weight: 600; color: #10b981;">Joined: ${ageDays} days ago</span><br><span style="font-size: 0.7rem; color: var(--text-muted);">${formatFullTime(u.createdAt)}</span></td>
-                <td data-label="User Info">${u.profile?.name || 'Unknown'} <br><span style="font-size: 0.75rem; color: var(--text-muted);">ID: ${u.id.substring(0,8)}...</span></td>
+                <td data-label="User Info">${u.profile?.name || 'Unknown'} <br><span style="font-size: 0.75rem; color: var(--text-muted);">ID: ${u.id.substring(0,8)}...</span> ${refTextForTable}</td>
                 <td data-label="Contact">${u.profile?.phone || u.phone}</td>
                 <td data-label="Balance"><span style="color: gold; font-weight: bold;"><i class="fa-solid fa-coins"></i> ${(u.coins || 0).toLocaleString()}</span></td>
                 <td data-label="Status">${statusBadge}</td>
@@ -531,7 +546,6 @@
         });
     }
 
-    // 🔥 UPDATED LOGIC & MOBILE FIX FOR REFERRALS TAB 🔥
     function renderReferrals() {
         const tbody = document.getElementById('tbody-referrals'); tbody.innerHTML = '';
         const sorted = [...allUsers].sort((a,b) => getSafeMs(b.createdAt) - getSafeMs(a.createdAt));
@@ -546,12 +560,9 @@
                     refName = "<span style='color: gold; font-weight: bold;'><i class='fa-solid fa-crown'></i> Admin</span>";
                     displayCode = "JRZZ1945";
                 } else {
-                    // Match user by Document ID (u.id) OR their short ref code
                     let referrerObj = allUsers.find(x => x.id === appliedCode || (x.profile && x.profile.refCode === appliedCode) || x.refCode === appliedCode);
-                    
                     if(referrerObj) {
                         refName = referrerObj.profile?.name || 'Unknown User';
-                        // Extract actual short code if available, else fallback
                         displayCode = referrerObj.profile?.refCode || referrerObj.refCode || appliedCode;
                     } else {
                         refName = 'Unknown User';
@@ -579,12 +590,10 @@
         });
     }
 
-    // 🔥 UPDATED LOGIC FOR TOP REFERRERS LEADERBOARD 🔥
     function renderRefLeaderboard() {
         const tbody = document.getElementById('tbody-ref-leaderboard'); tbody.innerHTML = '';
 
         let counts = {};
-        // 1. Count occurrences of the applied code/Doc ID
         allUsers.forEach(u => {
             let appliedCode = u.pendingReferrer || u.referredBy || u.appliedRefCode || u.invitedBy;
             if(appliedCode && appliedCode !== "None" && appliedCode.trim() !== "") {
@@ -593,22 +602,17 @@
         });
 
         let refLeaders = [];
-
-        // 2. Match occurrences back to actual users
         for (let refId in counts) {
             if(refId.toUpperCase() === "JRZZ1945") {
                 refLeaders.push({ name: "👑 Admin", code: "JRZZ1945", totalRefs: counts[refId] });
                 continue;
             }
 
-            // Match by Doc ID or Ref Code
             let referrerObj = allUsers.find(x => x.id === refId || (x.profile && x.profile.refCode === refId) || x.refCode === refId);
-
             if (referrerObj) {
                 let shortCode = referrerObj.profile?.refCode || referrerObj.refCode || refId;
                 refLeaders.push({ name: referrerObj.profile?.name || 'Unknown User', code: shortCode, totalRefs: counts[refId] });
             } else {
-                // Keep it if matched user is deleted but was referred by them
                 refLeaders.push({ name: 'Unknown User', code: refId, totalRefs: counts[refId] });
             }
         }
@@ -691,6 +695,7 @@
         });
     }
 
+    // 🔥 FIX 2: Overriding JRZZ1945 in MODAL (Eye Button) 🔥
     window.openUserModal = (userId) => {
         const user = allUsers.find(u => u.id === userId); if(!user) return;
         currentOpenUserId = userId; 
@@ -717,6 +722,21 @@
         const ageMs = Date.now() - getSafeMs(user.createdAt);
         const ageDays = Math.floor(ageMs / (1000 * 60 * 60 * 24));
         document.getElementById('modal-age').innerText = `${ageDays} Days`;
+        
+        let appliedCode = user.pendingReferrer || user.referredBy || user.appliedRefCode || user.invitedBy;
+        if(appliedCode && appliedCode !== "None" && appliedCode !== "") {
+            if(appliedCode.toUpperCase() === "JRZZ1945") {
+                document.getElementById('modal-referred-by').innerHTML = `<span style='color: gold; font-weight: bold;'><i class='fa-solid fa-crown'></i> Admin</span> <br><span style="color:var(--text-muted); font-size: 0.75rem;">Code: JRZZ1945</span>`;
+            } else {
+                let referrerObj = allUsers.find(x => x.id === appliedCode || (x.profile && x.profile.refCode === appliedCode) || x.refCode === appliedCode);
+                let refName = referrerObj ? (referrerObj.profile?.name || 'Unknown User') : 'Unknown User';
+                let displayCode = referrerObj ? (referrerObj.profile?.refCode || referrerObj.refCode || appliedCode) : appliedCode;
+                document.getElementById('modal-referred-by').innerHTML = `${refName} <br><span style="color:var(--text-muted); font-size: 0.75rem;">Code: ${displayCode}</span>`;
+            }
+        } else {
+            document.getElementById('modal-referred-by').innerHTML = `<span style="color:var(--text-muted);">Direct Join (No Code)</span>`;
+        }
+        
         document.getElementById('modal-device').innerText = user.deviceId || "Not Tracked";
         document.getElementById('modal-fb').innerText = (user.tasks && user.tasks.lastFbId) ? user.tasks.lastFbId : "Not Provided";
         document.getElementById('modal-insta').innerText = (user.tasks && user.tasks.lastInstaId) ? user.tasks.lastInstaId : "Not Provided";
@@ -934,6 +954,7 @@
 
         document.getElementById("fakeAlertBox").innerHTML = outputHTML;
     }
+
 </script>
 </body>
 </html>
