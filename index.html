@@ -44,7 +44,7 @@
         #admin-dashboard { display: none; padding: 20px; max-width: 1200px; margin: 0 auto; }
         .header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 20px; border-bottom: 1px solid var(--card-border); margin-bottom: 30px; }
         
-        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 30px; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
         .stat-card { background: var(--card-bg); padding: 25px; border-radius: 16px; border: 1px solid var(--card-border); border-left: 5px solid var(--primary); box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
         .stat-card h3 { color: var(--text-muted); font-size: 0.9rem; margin-bottom: 10px; text-transform: uppercase; }
         .stat-card .value { font-size: 2.5rem; font-weight: bold; }
@@ -212,6 +212,7 @@
             <div class="tab" onclick="switchTab('referrals')" id="tab-referrals">Referrals</div>
             <div class="tab" onclick="switchTab('ref-leaderboard')" id="tab-ref-leaderboard">Top Referrers</div>
             <div class="tab" onclick="switchTab('leaderboard')" id="tab-leaderboard">Coins Leaderboard</div>
+            <div class="tab" onclick="switchTab('admin-logs')" id="tab-admin-logs" style="border: 1px solid var(--info); color: var(--info);">🛡️ Admin Logs</div>
             <div class="tab" onclick="switchTab('settings')" id="tab-settings" style="border: 1px solid var(--warning); color: var(--warning);">⚙️ App Settings</div>
             
             <button class="btn btn-small" style="margin-left: auto; background: var(--bg-dark); border: 1px solid var(--card-border);" onclick="loadDashboardData()">Refresh</button>
@@ -306,6 +307,23 @@
             </table>
         </div>
 
+        <div class="table-container" id="sec-admin-logs">
+            <div style="padding: 20px; background: var(--bg-dark); border-bottom: 1px solid var(--card-border);">
+                <h3 style="color: var(--info);"><i class="fa-solid fa-shield-halved"></i> Admin Activity Logs</h3>
+                <p style="color: var(--text-muted); font-size: 0.85rem;">Record of all actions taken by Admin (Alerts, Bans, Notices, etc.)</p>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date & Time</th>
+                        <th>Action Type</th>
+                        <th>Details</th>
+                    </tr>
+                </thead>
+                <tbody id="tbody-admin-logs"></tbody>
+            </table>
+        </div>
+
         <div class="table-container" id="sec-settings" style="background: var(--card-bg); padding: 30px; border-radius: 16px;">
             <div class="settings-grid">
                 
@@ -343,9 +361,10 @@
     </div>
 
 <script type="module">
+    // Added addDoc to imports for logging
     import { initializeApp } from "https://www.gstatic.com/firebasejs/12.12.0/firebase-app.js";
     import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.12.0/firebase-auth.js";
-    import { getFirestore, collection, getDocs, updateDoc, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/12.12.0/firebase-firestore.js";
+    import { getFirestore, collection, getDocs, updateDoc, doc, getDoc, setDoc, addDoc } from "https://www.gstatic.com/firebasejs/12.12.0/firebase-firestore.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyCpS_rr77wh23C2LYl6xCSTyptMKlITauk",
@@ -363,6 +382,7 @@
 
     let allWithdrawals = [];
     let allUsers = [];
+    let adminLogsData = []; // Array for storing logs
     let currentTab = 'withdraw-pending';
     let currentOpenUserId = null; 
 
@@ -389,6 +409,19 @@
         setTimeout(() => { t.style.display = 'none'; }, 3000);
     }
 
+    // 🔥 NEW FUNCTION: Save Admin Action to Database 🔥
+    window.logAdminAction = async (actionType, detailsText) => {
+        try {
+            await addDoc(collection(db, "earnx_admin_logs"), {
+                type: actionType,
+                details: detailsText,
+                timestamp: Date.now()
+            });
+        } catch(e) {
+            console.log("Admin log save failed", e);
+        }
+    };
+
     onAuthStateChanged(auth, (user) => {
         if (user) {
             document.getElementById('login-screen').style.display = 'none';
@@ -413,7 +446,7 @@
 
     window.loadDashboardData = async () => {
         document.getElementById('main-loader').style.display = 'block';
-        allWithdrawals = []; allUsers = [];
+        allWithdrawals = []; allUsers = []; adminLogsData = [];
         try {
             const userSnap = await getDocs(collection(db, "earnx_users"));
             userSnap.forEach(doc => { let u = doc.data(); u.id = doc.id; allUsers.push(u); });
@@ -441,6 +474,13 @@
                 document.getElementById('admin-promo-code').value = promoSnap.data().code || "";
             }
 
+            // Fetch Admin Logs
+            try {
+                const logsSnap = await getDocs(collection(db, "earnx_admin_logs"));
+                logsSnap.forEach(doc => { adminLogsData.push(doc.data()); });
+                adminLogsData.sort((a,b) => getSafeMs(b.timestamp) - getSafeMs(a.timestamp));
+            } catch(e) { console.log("No logs yet or read error"); }
+
             window.refreshActiveTab();
         } catch (e) { window.showToast("Error loading data", true); }
         document.getElementById('main-loader').style.display = 'none';
@@ -454,6 +494,11 @@
         try {
             await setDoc(doc(db, "earnx_settings", "app_notice"), { isActive: status, message: msg, updatedAt: Date.now() });
             window.showToast("Global Notice Updated!");
+            
+            // Save to logs
+            let logMsg = status ? `Updated Global Notice: "${msg.substring(0, 30)}..."` : "Turned OFF Global Notice";
+            window.logAdminAction("Flash Message", logMsg);
+            
         } catch (error) { window.showToast("Error saving notice!", true); }
     };
 
@@ -463,6 +508,7 @@
         try {
             await setDoc(doc(db, "earnx_settings", "active_promo"), { code: code, updatedAt: Date.now() });
             window.showToast("Promo Code Updated Successfully!");
+            window.logAdminAction("Promo Code", `Changed Promo Code to: ${code}`);
         } catch (error) { window.showToast("Error saving promo code!", true); }
     };
 
@@ -478,6 +524,7 @@
         else if (tab === 'referrals') document.getElementById('sec-referrals').classList.add('active');
         else if (tab === 'ref-leaderboard') document.getElementById('sec-ref-leaderboard').classList.add('active');
         else if (tab === 'leaderboard') document.getElementById('sec-leaderboard').classList.add('active');
+        else if (tab === 'admin-logs') document.getElementById('sec-admin-logs').classList.add('active');
         else if (tab === 'settings') document.getElementById('sec-settings').classList.add('active');
         
         window.refreshActiveTab();
@@ -489,6 +536,29 @@
         else if (currentTab === 'referrals') renderReferrals();
         else if (currentTab === 'ref-leaderboard') renderRefLeaderboard();
         else if (currentTab === 'leaderboard') renderLeaderboard();
+        else if (currentTab === 'admin-logs') renderAdminLogs();
+    }
+
+    function renderAdminLogs() {
+        const tbody = document.getElementById('tbody-admin-logs'); tbody.innerHTML = '';
+        if(adminLogsData.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;">No admin actions recorded yet.</td></tr>`;
+            return;
+        }
+
+        adminLogsData.forEach(log => {
+            const tr = document.createElement('tr');
+            let color = "var(--primary)";
+            if(log.type.includes("Alert") || log.type.includes("Block") || log.type.includes("Reject")) color = "var(--danger)";
+            if(log.type.includes("Balance")) color = "var(--warning)";
+
+            tr.innerHTML = `
+                <td data-label="Date & Time"><span style="font-size: 0.8rem; color: var(--text-muted);">${formatFullTime(log.timestamp)}</span></td>
+                <td data-label="Action Type"><span style="font-weight: bold; color: ${color};">${log.type}</span></td>
+                <td data-label="Details"><div style="word-break: break-all;">${log.details}</div></td>
+            `;
+            tbody.appendChild(tr);
+        });
     }
 
     function renderWithdrawals() {
@@ -503,7 +573,7 @@
                 <td data-label="UPI ID">${w.upiId}</td>
                 <td data-label="Amount">₹${((w.coins / 10000) * 100).toFixed(2)}</td>
                 <td data-label="Status"><span class="badge ${w.status === 'Approved' ? 'badge-approved' : (w.status === 'Rejected' ? 'badge-rejected' : 'badge-pending')}">${w.status}</span></td>
-                ${isPending ? `<td data-label="Action"><div class="action-btns"><button class="btn btn-small" onclick="approveReq('${w.docId}')"><i class="fa-solid fa-check"></i></button><button class="btn btn-danger btn-small" onclick="rejectReq('${w.docId}', '${w.userId}', ${w.coins})"><i class="fa-solid fa-times"></i></button></div></td>` : '<td style="display:none;"></td>'}
+                ${isPending ? `<td data-label="Action"><div class="action-btns"><button class="btn btn-small" onclick="approveReq('${w.docId}', '${w.userId}', ${w.coins})"><i class="fa-solid fa-check"></i></button><button class="btn btn-danger btn-small" onclick="rejectReq('${w.docId}', '${w.userId}', ${w.coins})"><i class="fa-solid fa-times"></i></button></div></td>` : '<td style="display:none;"></td>'}
             `;
             tbody.appendChild(tr);
         });
@@ -518,31 +588,10 @@
             
             let statusBadge = u.isBlocked ? `<span class="badge badge-rejected">BLOCKED</span>` : `<span class="badge badge-approved">ACTIVE</span>`;
 
-            // Logic for force Admin name
-            let userActualName = u.profile?.name || 'Unknown';
-            let myOwnCode = (u.profile && u.profile.refCode) ? u.profile.refCode : u.refCode;
-            if(myOwnCode && myOwnCode.toUpperCase() === "JRZZ1945") {
-                userActualName = "👑 Admin";
-            }
-
-            let appliedCode = u.pendingReferrer || u.referredBy || u.appliedRefCode || u.invitedBy;
-            let refTextForTable = "";
-            
-            if(appliedCode && appliedCode !== "None" && appliedCode !== "") {
-                let refName = "";
-                if(appliedCode.toUpperCase() === "JRZZ1945") {
-                    refName = "Admin";
-                } else {
-                    let referrerObj = allUsers.find(x => x.id === appliedCode || (x.profile && x.profile.refCode === appliedCode) || x.refCode === appliedCode);
-                    refName = referrerObj ? (referrerObj.profile?.name || 'Unknown User') : 'Unknown';
-                }
-                refTextForTable = `<br><span style="font-size: 0.75rem; color: var(--primary);"><i class="fa-solid fa-user-plus"></i> Ref by: ${refName}</span>`;
-            }
-
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td data-label="Account Info"><span style="font-size: 0.8rem; font-weight: 600; color: #10b981;">Joined: ${ageDays} days ago</span><br><span style="font-size: 0.7rem; color: var(--text-muted);">${formatFullTime(u.createdAt)}</span></td>
-                <td data-label="User Info">${userActualName} <br><span style="font-size: 0.75rem; color: var(--text-muted);">ID: ${u.id.substring(0,8)}...</span> ${refTextForTable}</td>
+                <td data-label="User Info">${u.profile?.name || 'Unknown'} <br><span style="font-size: 0.75rem; color: var(--text-muted);">ID: ${u.id.substring(0,8)}...</span></td>
                 <td data-label="Contact">${u.profile?.phone || u.phone}</td>
                 <td data-label="Balance"><span style="color: gold; font-weight: bold;"><i class="fa-solid fa-coins"></i> ${(u.coins || 0).toLocaleString()}</span></td>
                 <td data-label="Status">${statusBadge}</td>
@@ -557,10 +606,6 @@
         const sorted = [...allUsers].sort((a,b) => getSafeMs(b.createdAt) - getSafeMs(a.createdAt));
         
         sorted.forEach(u => {
-            let joinedUserName = u.profile?.name || 'Unknown';
-            let myCodeForCheck = (u.profile && u.profile.refCode) ? u.profile.refCode : u.refCode;
-            if(myCodeForCheck && myCodeForCheck.toUpperCase() === "JRZZ1945") joinedUserName = "👑 Admin";
-
             let appliedCode = u.pendingReferrer || u.referredBy || u.appliedRefCode || u.invitedBy;
             let refName = "<span style='color: var(--text-muted);'>Direct Join</span>";
             let displayCode = "<span style='color: var(--text-muted);'>No Code</span>";
@@ -571,6 +616,7 @@
                     displayCode = "JRZZ1945";
                 } else {
                     let referrerObj = allUsers.find(x => x.id === appliedCode || (x.profile && x.profile.refCode === appliedCode) || x.refCode === appliedCode);
+                    
                     if(referrerObj) {
                         refName = referrerObj.profile?.name || 'Unknown User';
                         displayCode = referrerObj.profile?.refCode || referrerObj.refCode || appliedCode;
@@ -585,7 +631,7 @@
             tr.innerHTML = `
                 <td data-label="Username">
                     <div style="max-width: 100%; word-break: break-all;">
-                        <span style="font-weight: 600; color: white; font-size: 1.05rem;">${joinedUserName}</span><br>
+                        <span style="font-weight: 600; color: white; font-size: 1.05rem;">${u.profile?.name || 'Unknown'}</span><br>
                         <span style="font-size: 0.75rem; color: var(--text-muted);">ID: ${u.id.substring(0,10)}...</span>
                     </div>
                 </td>
@@ -602,6 +648,7 @@
 
     function renderRefLeaderboard() {
         const tbody = document.getElementById('tbody-ref-leaderboard'); tbody.innerHTML = '';
+
         let counts = {};
         allUsers.forEach(u => {
             let appliedCode = u.pendingReferrer || u.referredBy || u.appliedRefCode || u.invitedBy;
@@ -611,12 +658,15 @@
         });
 
         let refLeaders = [];
+
         for (let refId in counts) {
             if(refId.toUpperCase() === "JRZZ1945") {
                 refLeaders.push({ name: "👑 Admin", code: "JRZZ1945", totalRefs: counts[refId] });
                 continue;
             }
+
             let referrerObj = allUsers.find(x => x.id === refId || (x.profile && x.profile.refCode === refId) || x.refCode === refId);
+
             if (referrerObj) {
                 let shortCode = referrerObj.profile?.refCode || referrerObj.refCode || refId;
                 refLeaders.push({ name: referrerObj.profile?.name || 'Unknown User', code: shortCode, totalRefs: counts[refId] });
@@ -643,8 +693,16 @@
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td data-label="Rank">${rankHtml}</td>
-                <td data-label="User Name"><div style="word-break: break-all;"><span style="font-weight: 600; color: white; font-size: 1.1rem;">${leader.name}</span></div></td>
-                <td data-label="Referral Code"><div style="word-break: break-all;"><span style="font-size: 0.9rem; color: var(--primary);">${leader.code}</span></div></td>
+                <td data-label="User Name">
+                    <div style="word-break: break-all;">
+                        <span style="font-weight: 600; color: white; font-size: 1.1rem;">${leader.name}</span>
+                    </div>
+                </td>
+                <td data-label="Referral Code">
+                    <div style="word-break: break-all;">
+                        <span style="font-size: 0.9rem; color: var(--primary);">${leader.code}</span>
+                    </div>
+                </td>
                 <td data-label="Total Referrals"><span style="color: gold; font-weight: bold; font-size: 1.2rem;"><i class="fa-solid fa-users"></i> ${leader.totalRefs}</span></td>
             `;
             tbody.appendChild(tr);
@@ -653,10 +711,13 @@
 
     function renderLeaderboard() {
         const tbody = document.getElementById('tbody-leaderboard'); tbody.innerHTML = '';
+
         let withdrawTotals = {};
         allWithdrawals.forEach(w => {
             if(w.status === "Pending" || w.status === "Approved") {
-                if(!withdrawTotals[w.userId]) withdrawTotals[w.userId] = 0;
+                if(!withdrawTotals[w.userId]) {
+                    withdrawTotals[w.userId] = 0;
+                }
                 withdrawTotals[w.userId] += Number(w.coins);
             }
         });
@@ -666,7 +727,10 @@
             .map(u => {
                 let currentCoins = Number(u.coins) || 0;
                 let withdrawnCoins = withdrawTotals[u.id] || 0;
-                return { ...u, lifetimeCoins: currentCoins + withdrawnCoins };
+                return {
+                    ...u,
+                    lifetimeCoins: currentCoins + withdrawnCoins
+                };
             })
             .filter(u => u.lifetimeCoins > 0);
 
@@ -677,10 +741,7 @@
 
         topUsers.forEach((u, index) => {
             const rank = index + 1;
-            let name = u.profile?.name || 'Unknown User';
-            let myCode = (u.profile && u.profile.refCode) ? u.profile.refCode : u.refCode;
-            if(myCode && myCode.toUpperCase() === "JRZZ1945") name = "👑 Admin";
-
+            const name = (u.profile && u.profile.name) ? u.profile.name : 'Unknown User';
             let rankHtml = `<div class="rank-badge">${rank}</div>`;
             if(rank === 1) rankHtml = `<div class="rank-badge rank-1"><i class="fa-solid fa-crown"></i></div>`;
             else if(rank === 2) rankHtml = `<div class="rank-badge rank-2">2</div>`;
@@ -696,12 +757,8 @@
         const user = allUsers.find(u => u.id === userId); if(!user) return;
         currentOpenUserId = userId; 
 
-        let userDispName = user.profile?.name || 'Unknown User';
-        let myCodeModal = (user.profile && user.profile.refCode) ? user.profile.refCode : user.refCode;
-        if(myCodeModal && myCodeModal.toUpperCase() === "JRZZ1945") userDispName = "👑 Admin";
-
-        document.getElementById('modal-user-name').innerText = userDispName;
-        document.getElementById('modal-user-id').innerText = `ID: ${user.id} | Ref Code: ${myCodeModal || 'N/A'}`;
+        document.getElementById('modal-user-name').innerText = user.profile?.name || 'Unknown User';
+        document.getElementById('modal-user-id').innerText = `ID: ${user.id} | Ref Code: ${user.profile?.refCode || user.refCode || 'N/A'}`;
         document.getElementById('modal-user-coins').innerHTML = `<i class="fa-solid fa-coins"></i> ${(user.coins || 0).toLocaleString()}`;
         
         document.getElementById('admin-edit-name').value = user.profile?.name || '';
@@ -733,6 +790,7 @@
             const sortedTx = [...user.transactions].sort((a,b) => getSafeMs(b.date) - getSafeMs(a.date));
             taskCount = sortedTx.filter(t => t.type === 'earn' && t.title !== 'Admin Adjustment').length;
             lastActive = formatFullTime(sortedTx[0].date);
+
             sortedTx.forEach(t => {
                 txList.innerHTML += `<div class="history-item"><div class="h-info"><span class="h-title">${t.title}</span><span class="h-time" style="font-weight:600; color:white;">${formatFullTime(t.date)}</span></div><div class="h-amt ${t.type === 'earn' ? 'text-green' : 'text-danger'}">${t.type === 'earn' ? '+' : '-'}${t.amount}</div></div>`;
             });
@@ -740,122 +798,214 @@
 
         document.getElementById('modal-tasks-done').innerText = taskCount;
         document.getElementById('modal-last-active').innerText = lastActive;
+
         document.getElementById('user-modal').style.display = 'flex';
     }
 
-    window.closeUserModal = () => { document.getElementById('user-modal').style.display = 'none'; currentOpenUserId = null; }
+    window.closeUserModal = () => { 
+        document.getElementById('user-modal').style.display = 'none'; 
+        currentOpenUserId = null;
+    }
 
     window.adminSaveProfile = async () => {
         if(!currentOpenUserId) return;
+        
         const newName = document.getElementById('admin-edit-name').value.trim();
         const newPhone = document.getElementById('admin-edit-phone').value.trim();
+
         if(!confirm("Are you sure you want to change this user's profile details?")) return;
+
         try {
-            await updateDoc(doc(db, "earnx_users", currentOpenUserId), { "profile.name": newName, "profile.phone": newPhone });
+            await updateDoc(doc(db, "earnx_users", currentOpenUserId), { 
+                "profile.name": newName,
+                "profile.phone": newPhone
+            });
+            
             const userIndex = allUsers.findIndex(u => u.id === currentOpenUserId);
             if(userIndex !== -1) {
                 if(!allUsers[userIndex].profile) allUsers[userIndex].profile = {};
                 allUsers[userIndex].profile.name = newName;
                 allUsers[userIndex].profile.phone = newPhone;
             }
-            window.showToast("Profile Updated!");
+
+            document.getElementById('modal-user-name').innerText = newName || 'Unknown User';
+            window.showToast("Profile Updated Successfully!");
+            window.logAdminAction("Profile Edit", `Changed profile info for user ID: ${currentOpenUserId}`);
             window.refreshActiveTab(); 
-        } catch(e) { window.showToast("Error updating profile", true); }
+
+        } catch(e) {
+            window.showToast("Error updating profile", true);
+        }
     }
 
     window.toggleBlockUser = async () => {
         if(!currentOpenUserId) return;
         const userIndex = allUsers.findIndex(u => u.id === currentOpenUserId);
         if(userIndex === -1) return;
+        
         const isCurrentlyBlocked = allUsers[userIndex].isBlocked || false;
         const newStatus = !isCurrentlyBlocked;
-        if(!confirm(`Are you sure you want to proceed?`)) return;
+        const actionWord = newStatus ? "BLOCK" : "UNBLOCK";
+
+        if(!confirm(`Are you sure you want to ${actionWord} this user?`)) return;
+
         try {
             await updateDoc(doc(db, "earnx_users", currentOpenUserId), { isBlocked: newStatus });
             allUsers[userIndex].isBlocked = newStatus;
-            window.showToast(`Status Updated!`);
+            
+            window.showToast(`User successfully ${actionWord}ED!`);
+            window.logAdminAction(`User ${actionWord}`, `Admin marked user ID ${currentOpenUserId} as ${newStatus ? 'Blocked' : 'Active'}`);
             window.openUserModal(currentOpenUserId); 
             window.refreshActiveTab(); 
-        } catch(e) { window.showToast("Error", true); }
+        } catch(e) {
+            window.showToast("Error updating status", true);
+        }
     }
 
     window.sendPersonalAlert = async () => {
         if(!currentOpenUserId) return;
-        const alertMsg = prompt("Enter Warning Message:");
-        if(!alertMsg) return;
+        
+        const alertMsg = prompt("Enter a Warning/Alert message for this user.\n(It will popup next time they open the app):");
+        if(alertMsg === null || alertMsg.trim() === "") return;
+
         try {
             await updateDoc(doc(db, "earnx_users", currentOpenUserId), { personalAlert: alertMsg.trim() });
-            window.showToast("Alert Sent!");
-        } catch(e) { window.showToast("Error", true); }
+            window.showToast("Personal Alert Sent Successfully!");
+            
+            const user = allUsers.find(u => u.id === currentOpenUserId);
+            if(user) {
+                let txs = Array.isArray(user.transactions) ? user.transactions : [];
+                txs.unshift({ title: "Admin Warning Sent", amount: 0, type: "spend", date: Date.now() });
+                if(txs.length > 50) txs.pop();
+                await updateDoc(doc(db, "earnx_users", currentOpenUserId), { transactions: txs });
+                user.transactions = txs;
+                
+                // Save to Admin Logs
+                window.logAdminAction("Personal Alert", `Sent to user ${user.profile?.name || currentOpenUserId}. Msg: "${alertMsg}"`);
+                
+                window.openUserModal(currentOpenUserId); 
+            }
+        } catch(e) {
+            window.showToast("Error sending alert", true);
+        }
     }
 
     window.editUserBalance = async (userId, currentCoins) => {
-        const val = prompt(`Current: ${currentCoins}\n\nEnter amount (+/-):`);
-        if(!val) return;
+        const val = prompt(`Current Balance: ${currentCoins} Coins\n\nEnter amount to ADD (e.g. 50000) or DEDUCT (e.g. -10000):`);
+        if(val === null || val.trim() === "") return;
+        
         const amount = parseInt(val);
+        if(isNaN(amount) || amount === 0) return window.showToast("Invalid number entered!", true);
+        
         const newBalance = currentCoins + amount;
-        if(!confirm(`Confirm new balance: ${newBalance}?`)) return;
+        if(newBalance < 0) return window.showToast("Balance cannot be less than 0!", true);
+        
+        if(!confirm(`Are you sure? This user's new balance will be ${newBalance} Coins.`)) return;
+        
         try {
             const userRef = doc(db, "earnx_users", userId);
             const userSnap = await getDoc(userRef);
+            
             if(userSnap.exists()) {
                 const userData = userSnap.data();
                 let txs = Array.isArray(userData.transactions) ? userData.transactions : [];
-                txs.unshift({ title: "Admin Adjustment", amount: Math.abs(amount), type: amount > 0 ? "earn" : "spend", date: Date.now() });
+                const txType = amount > 0 ? "earn" : "spend";
+                const newTx = { title: "Admin Adjustment", amount: Math.abs(amount), type: txType, date: Date.now() };
+
+                txs.unshift(newTx);
                 if(txs.length > 50) txs.pop();
+                
                 await updateDoc(userRef, { coins: newBalance, transactions: txs });
+                
                 const localUser = allUsers.find(u => u.id === userId);
                 if(localUser) { localUser.coins = newBalance; localUser.transactions = txs; }
-                window.showToast("Updated!");
+                
+                window.showToast("Balance Updated Successfully!");
+                window.logAdminAction("Balance Edit", `User ${localUser.profile?.name || userId} balance changed by ${amount}. New total: ${newBalance}`);
                 window.refreshActiveTab(); 
             }
-        } catch(e) { window.showToast("Error", true); }
+        } catch(e) { window.showToast("Error updating balance", true); }
     }
 
-    window.approveReq = async (docId) => {
-        if(!confirm("Approve?")) return;
-        try { await updateDoc(doc(db, "earnx_withdrawals", docId), { status: "Approved" }); window.loadDashboardData(); } catch(e) { window.showToast("Error", true); }
+    // Fixed function signature to accept userId and coinAmount
+    window.approveReq = async (docId, userId, coinAmount) => {
+        if(!confirm("Are you sure you want to APPROVE this payment?")) return;
+        try {
+            await updateDoc(doc(db, "earnx_withdrawals", docId), { status: "Approved" });
+            window.showToast("Payment Approved!");
+            window.logAdminAction("Withdrawal Approved", `Approved payout of ${coinAmount} coins for user ${userId}`);
+            window.loadDashboardData(); 
+        } catch(e) { window.showToast("Error approving", true); }
     }
 
     window.rejectReq = async (docId, userId, coinAmount) => {
-        const reason = prompt("Reason:");
+        const reason = prompt("Enter reason for rejection (e.g. Invalid UPI, Cheating):");
         if(reason === null) return; 
+        
         try {
             await updateDoc(doc(db, "earnx_withdrawals", docId), { status: "Rejected", reason: reason || "Admin Rejected" });
             const userRef = doc(db, "earnx_users", userId);
             const userSnap = await getDoc(userRef);
+            
             if(userSnap.exists()) {
                 const userData = userSnap.data();
                 const newBalance = (Number(userData.coins) || 0) + coinAmount;
                 let txs = Array.isArray(userData.transactions) ? userData.transactions : [];
-                txs.unshift({ title: "Refund: Withdrawal Rejected", amount: coinAmount, type: "earn", date: Date.now() });
+                txs.unshift({ title: "Refund: " + (reason || "Withdrawal Rejected"), amount: coinAmount, type: "earn", date: Date.now() });
+                if(txs.length > 50) txs.pop();
+                
                 await updateDoc(userRef, { coins: newBalance, transactions: txs });
             }
+
+            window.showToast("Rejected & Coins Refunded to User!");
+            window.logAdminAction("Withdrawal Rejected", `Rejected ${coinAmount} coins payout for user ${userId}. Reason: ${reason}`);
             window.loadDashboardData(); 
-        } catch(e) { window.showToast("Error", true); }
+
+        } catch(e) { window.showToast("Error processing reject", true); }
     }
 
     window.findFakeUsers = () => {
-        if (!allUsers || allUsers.length === 0) return;
+        if (!allUsers || allUsers.length === 0) {
+            document.getElementById("fakeAlertBox").innerHTML = "<span style='color: var(--warning);'>⚠️ Please wait for user data to load first!</span>";
+            return;
+        }
+
         let deviceCount = {};
-        let outputHTML = "<hr style='border-color: var(--card-border); margin: 15px 0;'><h4 style='color: var(--danger); margin-bottom: 10px;'>Fake Accounts:</h4>";
+        let outputHTML = "<hr style='border-color: var(--card-border); margin: 15px 0;'><h4 style='color: var(--danger); margin-bottom: 10px;'>Fake Accounts Found (Same Device ID):</h4>";
         let foundFake = false;
+
         allUsers.forEach(user => {
             let id = user.deviceId; 
+            
             if(id && id.trim() !== "") { 
-                let uName = user.profile?.name || 'Unknown';
-                if(user.profile?.refCode === "JRZZ1945") uName = "👑 Admin";
-                let userInfo = `<b>${uName}</b> (Coins: ${user.coins || 0}) <br><span style='font-size:0.75rem; color:var(--text-muted);'>ID: ${user.id.substring(0,8)}...</span>`;
-                if(deviceCount[id]) deviceCount[id].push(userInfo); else deviceCount[id] = [userInfo];
+                let userInfo = `<b>${user.profile?.name || 'Unknown'}</b> (Coins: ${user.coins || 0}) <br><span style='font-size:0.75rem; color:var(--text-muted);'>ID: ${user.id}</span>`;
+                
+                if(deviceCount[id]) {
+                    deviceCount[id].push(userInfo);
+                } else {
+                    deviceCount[id] = [userInfo];
+                }
             }
         });
+
         for (let deviceId in deviceCount) {
             if(deviceCount[deviceId].length > 1) {
                 foundFake = true;
-                outputHTML += `<div style="background: var(--bg-dark); padding: 10px; border-left: 4px solid var(--danger); margin-bottom: 10px; border-radius: 4px;"><span style="color: var(--warning); font-size: 0.8rem;">Device ID: ${deviceId}</span><div style="margin-top:5px; margin-left: 10px; border-left: 1px dashed var(--card-border); padding-left: 10px;">👉 ${deviceCount[deviceId].join('<br><br> 👉 ')}</div></div>`;
+                outputHTML += `
+                <div style="background: var(--bg-dark); padding: 10px; border-left: 4px solid var(--danger); margin-bottom: 10px; border-radius: 4px;">
+                    <span style="color: var(--warning); font-size: 0.8rem; margin-bottom: 5px; display: block;"><i class="fa-solid fa-mobile-screen"></i> Device ID: ${deviceId}</span>
+                    <div style="margin-left: 10px; padding-left: 10px; border-left: 1px dashed var(--card-border);">
+                        👉 ${deviceCount[deviceId].join('<br><br> 👉 ')}
+                    </div>
+                </div>`;
             }
         }
-        document.getElementById("fakeAlertBox").innerHTML = foundFake ? outputHTML : "<p style='color: var(--primary);'>✅ No fake accounts detected.</p>";
+
+        if(!foundFake) {
+            outputHTML = "<p style='color: var(--primary); font-weight: bold;'><i class='fa-solid fa-circle-check'></i> All clean! No fake accounts detected.</p>";
+        }
+
+        document.getElementById("fakeAlertBox").innerHTML = outputHTML;
     }
 </script>
 </body>
