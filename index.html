@@ -483,11 +483,14 @@
             
             let statusBadge = u.isBlocked ? `<span class="badge badge-rejected">BLOCKED</span>` : `<span class="badge badge-approved">ACTIVE</span>`;
 
-            // 🔥 LOGIC FOR REFERRED BY IN TABLE (NEW) 🔥
-            let appliedCode = u.referredBy || u.appliedRefCode || u.invitedBy;
+            // 🔥 LOGIC FOR REFERRED BY IN TABLE (UPDATED) 🔥
+            // Ab ye pendingReferrer ko bhi check karega
+            let appliedCode = u.pendingReferrer || u.referredBy || u.appliedRefCode || u.invitedBy;
             let refTextForTable = "";
+            
             if(appliedCode && appliedCode !== "None" && appliedCode !== "") {
-                let referrerObj = allUsers.find(x => x.refCode === appliedCode);
+                // Ab ye sahi jagah (profile.refCode) me match dhundhega
+                let referrerObj = allUsers.find(x => (x.profile && x.profile.refCode === appliedCode) || x.refCode === appliedCode);
                 let refName = referrerObj ? (referrerObj.profile?.name || 'Unknown User') : 'Unknown';
                 refTextForTable = `<br><span style="font-size: 0.75rem; color: var(--primary);"><i class="fa-solid fa-user-plus"></i> Ref by: ${refName}</span>`;
             }
@@ -553,8 +556,11 @@
         const user = allUsers.find(u => u.id === userId); if(!user) return;
         currentOpenUserId = userId; 
 
+        // Ek chota sa fix: Modal me ab user ka khud ka refCode sahi se dikhega
+        let ownRefCode = user.profile?.refCode || user.refCode || 'N/A';
+
         document.getElementById('modal-user-name').innerText = user.profile?.name || 'Unknown User';
-        document.getElementById('modal-user-id').innerText = `ID: ${user.id} | Ref Code: ${user.refCode || 'N/A'}`;
+        document.getElementById('modal-user-id').innerText = `ID: ${user.id} | Ref Code: ${ownRefCode}`;
         document.getElementById('modal-user-coins').innerHTML = `<i class="fa-solid fa-coins"></i> ${(user.coins || 0).toLocaleString()}`;
         
         document.getElementById('admin-edit-name').value = user.profile?.name || '';
@@ -576,10 +582,10 @@
         const ageDays = Math.floor(ageMs / (1000 * 60 * 60 * 24));
         document.getElementById('modal-age').innerText = `${ageDays} Days`;
         
-        // 🔥 LOGIC FOR REFERRED BY IN MODAL (NEW) 🔥
-        let appliedCode = user.referredBy || user.appliedRefCode || user.invitedBy;
+        // 🔥 LOGIC FOR REFERRED BY IN MODAL (UPDATED) 🔥
+        let appliedCode = user.pendingReferrer || user.referredBy || user.appliedRefCode || user.invitedBy;
         if(appliedCode && appliedCode !== "None" && appliedCode !== "") {
-            let referrerObj = allUsers.find(x => x.refCode === appliedCode);
+            let referrerObj = allUsers.find(x => (x.profile && x.profile.refCode === appliedCode) || x.refCode === appliedCode);
             let refName = referrerObj ? (referrerObj.profile?.name || 'Unknown User') : 'Unknown User';
             document.getElementById('modal-referred-by').innerHTML = `${refName} <br><span style="color:var(--text-muted); font-size: 0.75rem;">Code: ${appliedCode}</span>`;
         } else {
