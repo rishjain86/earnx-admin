@@ -210,7 +210,8 @@
             <div class="tab" onclick="switchTab('withdraw-history')" id="tab-withdraw-history">History</div>
             <div class="tab" onclick="switchTab('users')" id="tab-users">All Users</div>
             <div class="tab" onclick="switchTab('referrals')" id="tab-referrals">Referrals</div>
-            <div class="tab" onclick="switchTab('leaderboard')" id="tab-leaderboard">Leaderboard</div>
+            <div class="tab" onclick="switchTab('ref-leaderboard')" id="tab-ref-leaderboard">Top Referrers</div>
+            <div class="tab" onclick="switchTab('leaderboard')" id="tab-leaderboard">Coins Leaderboard</div>
             <div class="tab" onclick="switchTab('settings')" id="tab-settings" style="border: 1px solid var(--warning); color: var(--warning);">⚙️ App Settings</div>
             
             <button class="btn btn-small" style="margin-left: auto; background: var(--bg-dark); border: 1px solid var(--card-border);" onclick="loadDashboardData()">Refresh</button>
@@ -274,6 +275,20 @@
                     </tr>
                 </thead>
                 <tbody id="tbody-referrals"></tbody>
+            </table>
+        </div>
+
+        <div class="table-container" id="sec-ref-leaderboard">
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 80px;">Rank</th>
+                        <th>User Name</th>
+                        <th>Referral Code</th>
+                        <th>Total Referrals</th>
+                    </tr>
+                </thead>
+                <tbody id="tbody-ref-leaderboard"></tbody>
             </table>
         </div>
 
@@ -460,7 +475,8 @@
         
         if(tab.startsWith('withdraw')) document.getElementById('sec-withdrawals').classList.add('active');
         else if (tab === 'users') document.getElementById('sec-users').classList.add('active');
-        else if (tab === 'referrals') document.getElementById('sec-referrals').classList.add('active'); // Added Link
+        else if (tab === 'referrals') document.getElementById('sec-referrals').classList.add('active');
+        else if (tab === 'ref-leaderboard') document.getElementById('sec-ref-leaderboard').classList.add('active');
         else if (tab === 'leaderboard') document.getElementById('sec-leaderboard').classList.add('active');
         else if (tab === 'settings') document.getElementById('sec-settings').classList.add('active');
         
@@ -470,7 +486,8 @@
     window.refreshActiveTab = () => {
         if(currentTab.startsWith('withdraw')) renderWithdrawals();
         else if (currentTab === 'users') renderUsers();
-        else if (currentTab === 'referrals') renderReferrals(); // Added Render
+        else if (currentTab === 'referrals') renderReferrals();
+        else if (currentTab === 'ref-leaderboard') renderRefLeaderboard();
         else if (currentTab === 'leaderboard') renderLeaderboard();
     }
 
@@ -492,7 +509,6 @@
         });
     }
 
-    // 🔥 ORIGINAL RENDER USERS FUNCTION (UNCHANGED) 🔥
     function renderUsers() {
         const tbody = document.getElementById('tbody-users'); tbody.innerHTML = '';
         const sorted = [...allUsers].sort((a,b) => getSafeMs(b.createdAt) - getSafeMs(a.createdAt));
@@ -500,7 +516,6 @@
             const ageMs = Date.now() - getSafeMs(u.createdAt);
             const ageDays = Math.floor(ageMs / (1000 * 60 * 60 * 24));
             
-            // Show if user is blocked in the table
             let statusBadge = u.isBlocked ? `<span class="badge badge-rejected">BLOCKED</span>` : `<span class="badge badge-approved">ACTIVE</span>`;
 
             const tr = document.createElement('tr');
@@ -516,7 +531,6 @@
         });
     }
 
-    // 🔥 NEW RENDER REFERRALS FUNCTION 🔥
     function renderReferrals() {
         const tbody = document.getElementById('tbody-referrals'); tbody.innerHTML = '';
         const sorted = [...allUsers].sort((a,b) => getSafeMs(b.createdAt) - getSafeMs(a.createdAt));
@@ -528,7 +542,6 @@
             
             if(appliedCode && appliedCode !== "None" && appliedCode !== "") {
                 displayCode = appliedCode;
-                // Special condition for Admin code
                 if(appliedCode.toUpperCase() === "JRZZ1945") {
                     refName = "<span style='color: gold; font-weight: bold;'><i class='fa-solid fa-crown'></i> Admin</span>";
                 } else {
@@ -537,16 +550,75 @@
                 }
             }
 
+            // Mobile view fix: Added div with flex-direction column inside td to prevent overlapping
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td data-label="Username">
-                    <span style="font-weight: 600; color: white; font-size: 1.05rem;">${u.profile?.name || 'Unknown'}</span><br>
-                    <span style="font-size: 0.75rem; color: var(--text-muted);">ID: ${u.id}</span>
+                    <div style="display: flex; flex-direction: column; align-items: flex-end;">
+                        <span style="font-weight: 600; color: white; font-size: 1.05rem;">${u.profile?.name || 'Unknown'}</span>
+                        <span style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">ID: ${u.id.substring(0,8)}...</span>
+                    </div>
                 </td>
                 <td data-label="Referred By">
-                    <span style="font-size: 1rem;">${refName}</span><br>
-                    <span style="font-size: 0.8rem; color: var(--primary);">Code: ${displayCode}</span>
+                    <div style="display: flex; flex-direction: column; align-items: flex-end;">
+                        <span style="font-size: 1rem;">${refName}</span>
+                        <span style="font-size: 0.8rem; color: var(--primary); margin-top: 2px;">Code: ${displayCode}</span>
+                    </div>
                 </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    function renderRefLeaderboard() {
+        const tbody = document.getElementById('tbody-ref-leaderboard'); tbody.innerHTML = '';
+
+        let counts = {};
+        allUsers.forEach(u => {
+            let appliedCode = u.pendingReferrer || u.referredBy || u.appliedRefCode || u.invitedBy;
+            if(appliedCode && appliedCode !== "None" && appliedCode.trim() !== "") {
+                appliedCode = appliedCode.toUpperCase();
+                counts[appliedCode] = (counts[appliedCode] || 0) + 1;
+            }
+        });
+
+        let refLeaders = [];
+        allUsers.forEach(u => {
+            let myCode = (u.profile && u.profile.refCode) ? u.profile.refCode : u.refCode;
+            if(myCode) {
+                myCode = myCode.toUpperCase();
+                let myCount = counts[myCode] || 0;
+                if(myCount > 0) {
+                    refLeaders.push({ name: u.profile?.name || 'Unknown User', code: myCode, totalRefs: myCount });
+                }
+            }
+        });
+
+        if(counts["JRZZ1945"] && !refLeaders.find(x => x.code === "JRZZ1945")) {
+            refLeaders.push({ name: "👑 Admin", code: "JRZZ1945", totalRefs: counts["JRZZ1945"] });
+        }
+
+        refLeaders.sort((a,b) => b.totalRefs - a.totalRefs);
+        const topReferrers = refLeaders.slice(0, 50);
+
+        if(topReferrers.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;">No referrals found yet.</td></tr>`;
+            return;
+        }
+
+        topReferrers.forEach((leader, index) => {
+            const rank = index + 1;
+            let rankHtml = `<div class="rank-badge">${rank}</div>`;
+            if(rank === 1) rankHtml = `<div class="rank-badge rank-1"><i class="fa-solid fa-crown"></i></div>`;
+            else if(rank === 2) rankHtml = `<div class="rank-badge rank-2">2</div>`;
+            else if(rank === 3) rankHtml = `<div class="rank-badge rank-3">3</div>`;
+
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td data-label="Rank">${rankHtml}</td>
+                <td data-label="User Name"><span style="font-weight: 600; color: white; font-size: 1.1rem;">${leader.name}</span></td>
+                <td data-label="Referral Code"><span style="font-size: 0.9rem; color: var(--primary);">${leader.code}</span></td>
+                <td data-label="Total Referrals"><span style="color: gold; font-weight: bold; font-size: 1.2rem;"><i class="fa-solid fa-users"></i> ${leader.totalRefs}</span></td>
             `;
             tbody.appendChild(tr);
         });
@@ -555,7 +627,6 @@
     function renderLeaderboard() {
         const tbody = document.getElementById('tbody-leaderboard'); tbody.innerHTML = '';
 
-        // Calculate withdrawn coins for each user
         let withdrawTotals = {};
         allWithdrawals.forEach(w => {
             if(w.status === "Pending" || w.status === "Approved") {
@@ -566,7 +637,6 @@
             }
         });
 
-        // Map users, calculate lifetime coins, filter blocked users and 0 earners
         let usersWithLifetime = allUsers
             .filter(u => !u.isBlocked)
             .map(u => {
@@ -579,7 +649,6 @@
             })
             .filter(u => u.lifetimeCoins > 0);
 
-        // Sort descending and get top 50
         const sortedUsers = usersWithLifetime.sort((a,b) => b.lifetimeCoins - a.lifetimeCoins);
         const topUsers = sortedUsers.slice(0, 50);
 
@@ -599,7 +668,6 @@
         });
     }
 
-    // 🔥 ORIGINAL USER MODAL FUNCTION (UNCHANGED) 🔥
     window.openUserModal = (userId) => {
         const user = allUsers.find(u => u.id === userId); if(!user) return;
         currentOpenUserId = userId; 
@@ -608,11 +676,9 @@
         document.getElementById('modal-user-id').innerText = `ID: ${user.id} | Ref Code: ${user.refCode || 'N/A'}`;
         document.getElementById('modal-user-coins').innerHTML = `<i class="fa-solid fa-coins"></i> ${(user.coins || 0).toLocaleString()}`;
         
-        // 🔥 Pre-fill Edit Profile Inputs 🔥
         document.getElementById('admin-edit-name').value = user.profile?.name || '';
         document.getElementById('admin-edit-phone').value = user.profile?.phone || '';
 
-        // Show Block Status
         const blockBadge = document.getElementById('modal-block-status');
         const blockBtn = document.getElementById('btn-block');
         if(user.isBlocked) {
@@ -670,7 +736,6 @@
                 "profile.phone": newPhone
             });
             
-            // Update local array so UI updates instantly without reloading
             const userIndex = allUsers.findIndex(u => u.id === currentOpenUserId);
             if(userIndex !== -1) {
                 if(!allUsers[userIndex].profile) allUsers[userIndex].profile = {};
@@ -680,7 +745,7 @@
 
             document.getElementById('modal-user-name').innerText = newName || 'Unknown User';
             window.showToast("Profile Updated Successfully!");
-            window.refreshActiveTab(); // Refresh the table behind the modal
+            window.refreshActiveTab(); 
 
         } catch(e) {
             window.showToast("Error updating profile", true);
@@ -703,8 +768,8 @@
             allUsers[userIndex].isBlocked = newStatus;
             
             window.showToast(`User successfully ${actionWord}ED!`);
-            window.openUserModal(currentOpenUserId); // Refresh Modal UI
-            window.refreshActiveTab(); // Refresh Table UI
+            window.openUserModal(currentOpenUserId); 
+            window.refreshActiveTab(); 
         } catch(e) {
             window.showToast("Error updating status", true);
         }
@@ -726,7 +791,7 @@
                 if(txs.length > 50) txs.pop();
                 await updateDoc(doc(db, "earnx_users", currentOpenUserId), { transactions: txs });
                 user.transactions = txs;
-                window.openUserModal(currentOpenUserId); // Refresh modal to show note
+                window.openUserModal(currentOpenUserId); 
             }
         } catch(e) {
             window.showToast("Error sending alert", true);
@@ -803,7 +868,6 @@
         } catch(e) { window.showToast("Error processing reject", true); }
     }
 
-    // 🔥 NEW FAKE USER LOGIC ADDED AT THE END 🔥
     window.findFakeUsers = () => {
         if (!allUsers || allUsers.length === 0) {
             document.getElementById("fakeAlertBox").innerHTML = "<span style='color: var(--warning);'>⚠️ Please wait for user data to load first!</span>";
