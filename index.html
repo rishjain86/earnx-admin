@@ -509,7 +509,6 @@
         });
     }
 
-    // 🔥 FIX 1: Overriding JRZZ1945 in ALL USERS table 🔥
     function renderUsers() {
         const tbody = document.getElementById('tbody-users'); tbody.innerHTML = '';
         const sorted = [...allUsers].sort((a,b) => getSafeMs(b.createdAt) - getSafeMs(a.createdAt));
@@ -518,6 +517,13 @@
             const ageDays = Math.floor(ageMs / (1000 * 60 * 60 * 24));
             
             let statusBadge = u.isBlocked ? `<span class="badge badge-rejected">BLOCKED</span>` : `<span class="badge badge-approved">ACTIVE</span>`;
+
+            // Logic for force Admin name
+            let userActualName = u.profile?.name || 'Unknown';
+            let myOwnCode = (u.profile && u.profile.refCode) ? u.profile.refCode : u.refCode;
+            if(myOwnCode && myOwnCode.toUpperCase() === "JRZZ1945") {
+                userActualName = "👑 Admin";
+            }
 
             let appliedCode = u.pendingReferrer || u.referredBy || u.appliedRefCode || u.invitedBy;
             let refTextForTable = "";
@@ -536,7 +542,7 @@
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td data-label="Account Info"><span style="font-size: 0.8rem; font-weight: 600; color: #10b981;">Joined: ${ageDays} days ago</span><br><span style="font-size: 0.7rem; color: var(--text-muted);">${formatFullTime(u.createdAt)}</span></td>
-                <td data-label="User Info">${u.profile?.name || 'Unknown'} <br><span style="font-size: 0.75rem; color: var(--text-muted);">ID: ${u.id.substring(0,8)}...</span> ${refTextForTable}</td>
+                <td data-label="User Info">${userActualName} <br><span style="font-size: 0.75rem; color: var(--text-muted);">ID: ${u.id.substring(0,8)}...</span> ${refTextForTable}</td>
                 <td data-label="Contact">${u.profile?.phone || u.phone}</td>
                 <td data-label="Balance"><span style="color: gold; font-weight: bold;"><i class="fa-solid fa-coins"></i> ${(u.coins || 0).toLocaleString()}</span></td>
                 <td data-label="Status">${statusBadge}</td>
@@ -551,6 +557,10 @@
         const sorted = [...allUsers].sort((a,b) => getSafeMs(b.createdAt) - getSafeMs(a.createdAt));
         
         sorted.forEach(u => {
+            let joinedUserName = u.profile?.name || 'Unknown';
+            let myCodeForCheck = (u.profile && u.profile.refCode) ? u.profile.refCode : u.refCode;
+            if(myCodeForCheck && myCodeForCheck.toUpperCase() === "JRZZ1945") joinedUserName = "👑 Admin";
+
             let appliedCode = u.pendingReferrer || u.referredBy || u.appliedRefCode || u.invitedBy;
             let refName = "<span style='color: var(--text-muted);'>Direct Join</span>";
             let displayCode = "<span style='color: var(--text-muted);'>No Code</span>";
@@ -575,7 +585,7 @@
             tr.innerHTML = `
                 <td data-label="Username">
                     <div style="max-width: 100%; word-break: break-all;">
-                        <span style="font-weight: 600; color: white; font-size: 1.05rem;">${u.profile?.name || 'Unknown'}</span><br>
+                        <span style="font-weight: 600; color: white; font-size: 1.05rem;">${joinedUserName}</span><br>
                         <span style="font-size: 0.75rem; color: var(--text-muted);">ID: ${u.id.substring(0,10)}...</span>
                     </div>
                 </td>
@@ -592,7 +602,6 @@
 
     function renderRefLeaderboard() {
         const tbody = document.getElementById('tbody-ref-leaderboard'); tbody.innerHTML = '';
-
         let counts = {};
         allUsers.forEach(u => {
             let appliedCode = u.pendingReferrer || u.referredBy || u.appliedRefCode || u.invitedBy;
@@ -607,7 +616,6 @@
                 refLeaders.push({ name: "👑 Admin", code: "JRZZ1945", totalRefs: counts[refId] });
                 continue;
             }
-
             let referrerObj = allUsers.find(x => x.id === refId || (x.profile && x.profile.refCode === refId) || x.refCode === refId);
             if (referrerObj) {
                 let shortCode = referrerObj.profile?.refCode || referrerObj.refCode || refId;
@@ -635,16 +643,8 @@
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td data-label="Rank">${rankHtml}</td>
-                <td data-label="User Name">
-                    <div style="word-break: break-all;">
-                        <span style="font-weight: 600; color: white; font-size: 1.1rem;">${leader.name}</span>
-                    </div>
-                </td>
-                <td data-label="Referral Code">
-                    <div style="word-break: break-all;">
-                        <span style="font-size: 0.9rem; color: var(--primary);">${leader.code}</span>
-                    </div>
-                </td>
+                <td data-label="User Name"><div style="word-break: break-all;"><span style="font-weight: 600; color: white; font-size: 1.1rem;">${leader.name}</span></div></td>
+                <td data-label="Referral Code"><div style="word-break: break-all;"><span style="font-size: 0.9rem; color: var(--primary);">${leader.code}</span></div></td>
                 <td data-label="Total Referrals"><span style="color: gold; font-weight: bold; font-size: 1.2rem;"><i class="fa-solid fa-users"></i> ${leader.totalRefs}</span></td>
             `;
             tbody.appendChild(tr);
@@ -653,13 +653,10 @@
 
     function renderLeaderboard() {
         const tbody = document.getElementById('tbody-leaderboard'); tbody.innerHTML = '';
-
         let withdrawTotals = {};
         allWithdrawals.forEach(w => {
             if(w.status === "Pending" || w.status === "Approved") {
-                if(!withdrawTotals[w.userId]) {
-                    withdrawTotals[w.userId] = 0;
-                }
+                if(!withdrawTotals[w.userId]) withdrawTotals[w.userId] = 0;
                 withdrawTotals[w.userId] += Number(w.coins);
             }
         });
@@ -669,10 +666,7 @@
             .map(u => {
                 let currentCoins = Number(u.coins) || 0;
                 let withdrawnCoins = withdrawTotals[u.id] || 0;
-                return {
-                    ...u,
-                    lifetimeCoins: currentCoins + withdrawnCoins
-                };
+                return { ...u, lifetimeCoins: currentCoins + withdrawnCoins };
             })
             .filter(u => u.lifetimeCoins > 0);
 
@@ -683,7 +677,10 @@
 
         topUsers.forEach((u, index) => {
             const rank = index + 1;
-            const name = (u.profile && u.profile.name) ? u.profile.name : 'Unknown User';
+            let name = u.profile?.name || 'Unknown User';
+            let myCode = (u.profile && u.profile.refCode) ? u.profile.refCode : u.refCode;
+            if(myCode && myCode.toUpperCase() === "JRZZ1945") name = "👑 Admin";
+
             let rankHtml = `<div class="rank-badge">${rank}</div>`;
             if(rank === 1) rankHtml = `<div class="rank-badge rank-1"><i class="fa-solid fa-crown"></i></div>`;
             else if(rank === 2) rankHtml = `<div class="rank-badge rank-2">2</div>`;
@@ -695,13 +692,16 @@
         });
     }
 
-    // 🔥 FIX 2: Overriding JRZZ1945 in MODAL (Eye Button) 🔥
     window.openUserModal = (userId) => {
         const user = allUsers.find(u => u.id === userId); if(!user) return;
         currentOpenUserId = userId; 
 
-        document.getElementById('modal-user-name').innerText = user.profile?.name || 'Unknown User';
-        document.getElementById('modal-user-id').innerText = `ID: ${user.id} | Ref Code: ${user.profile?.refCode || user.refCode || 'N/A'}`;
+        let userDispName = user.profile?.name || 'Unknown User';
+        let myCodeModal = (user.profile && user.profile.refCode) ? user.profile.refCode : user.refCode;
+        if(myCodeModal && myCodeModal.toUpperCase() === "JRZZ1945") userDispName = "👑 Admin";
+
+        document.getElementById('modal-user-name').innerText = userDispName;
+        document.getElementById('modal-user-id').innerText = `ID: ${user.id} | Ref Code: ${myCodeModal || 'N/A'}`;
         document.getElementById('modal-user-coins').innerHTML = `<i class="fa-solid fa-coins"></i> ${(user.coins || 0).toLocaleString()}`;
         
         document.getElementById('admin-edit-name').value = user.profile?.name || '';
@@ -722,21 +722,6 @@
         const ageMs = Date.now() - getSafeMs(user.createdAt);
         const ageDays = Math.floor(ageMs / (1000 * 60 * 60 * 24));
         document.getElementById('modal-age').innerText = `${ageDays} Days`;
-        
-        let appliedCode = user.pendingReferrer || user.referredBy || user.appliedRefCode || user.invitedBy;
-        if(appliedCode && appliedCode !== "None" && appliedCode !== "") {
-            if(appliedCode.toUpperCase() === "JRZZ1945") {
-                document.getElementById('modal-referred-by').innerHTML = `<span style='color: gold; font-weight: bold;'><i class='fa-solid fa-crown'></i> Admin</span> <br><span style="color:var(--text-muted); font-size: 0.75rem;">Code: JRZZ1945</span>`;
-            } else {
-                let referrerObj = allUsers.find(x => x.id === appliedCode || (x.profile && x.profile.refCode === appliedCode) || x.refCode === appliedCode);
-                let refName = referrerObj ? (referrerObj.profile?.name || 'Unknown User') : 'Unknown User';
-                let displayCode = referrerObj ? (referrerObj.profile?.refCode || referrerObj.refCode || appliedCode) : appliedCode;
-                document.getElementById('modal-referred-by').innerHTML = `${refName} <br><span style="color:var(--text-muted); font-size: 0.75rem;">Code: ${displayCode}</span>`;
-            }
-        } else {
-            document.getElementById('modal-referred-by').innerHTML = `<span style="color:var(--text-muted);">Direct Join (No Code)</span>`;
-        }
-        
         document.getElementById('modal-device').innerText = user.deviceId || "Not Tracked";
         document.getElementById('modal-fb').innerText = (user.tasks && user.tasks.lastFbId) ? user.tasks.lastFbId : "Not Provided";
         document.getElementById('modal-insta').innerText = (user.tasks && user.tasks.lastInstaId) ? user.tasks.lastInstaId : "Not Provided";
@@ -748,7 +733,6 @@
             const sortedTx = [...user.transactions].sort((a,b) => getSafeMs(b.date) - getSafeMs(a.date));
             taskCount = sortedTx.filter(t => t.type === 'earn' && t.title !== 'Admin Adjustment').length;
             lastActive = formatFullTime(sortedTx[0].date);
-
             sortedTx.forEach(t => {
                 txList.innerHTML += `<div class="history-item"><div class="h-info"><span class="h-title">${t.title}</span><span class="h-time" style="font-weight:600; color:white;">${formatFullTime(t.date)}</span></div><div class="h-amt ${t.type === 'earn' ? 'text-green' : 'text-danger'}">${t.type === 'earn' ? '+' : '-'}${t.amount}</div></div>`;
             });
@@ -756,205 +740,123 @@
 
         document.getElementById('modal-tasks-done').innerText = taskCount;
         document.getElementById('modal-last-active').innerText = lastActive;
-
         document.getElementById('user-modal').style.display = 'flex';
     }
 
-    window.closeUserModal = () => { 
-        document.getElementById('user-modal').style.display = 'none'; 
-        currentOpenUserId = null;
-    }
+    window.closeUserModal = () => { document.getElementById('user-modal').style.display = 'none'; currentOpenUserId = null; }
 
     window.adminSaveProfile = async () => {
         if(!currentOpenUserId) return;
-        
         const newName = document.getElementById('admin-edit-name').value.trim();
         const newPhone = document.getElementById('admin-edit-phone').value.trim();
-
         if(!confirm("Are you sure you want to change this user's profile details?")) return;
-
         try {
-            await updateDoc(doc(db, "earnx_users", currentOpenUserId), { 
-                "profile.name": newName,
-                "profile.phone": newPhone
-            });
-            
+            await updateDoc(doc(db, "earnx_users", currentOpenUserId), { "profile.name": newName, "profile.phone": newPhone });
             const userIndex = allUsers.findIndex(u => u.id === currentOpenUserId);
             if(userIndex !== -1) {
                 if(!allUsers[userIndex].profile) allUsers[userIndex].profile = {};
                 allUsers[userIndex].profile.name = newName;
                 allUsers[userIndex].profile.phone = newPhone;
             }
-
-            document.getElementById('modal-user-name').innerText = newName || 'Unknown User';
-            window.showToast("Profile Updated Successfully!");
+            window.showToast("Profile Updated!");
             window.refreshActiveTab(); 
-
-        } catch(e) {
-            window.showToast("Error updating profile", true);
-        }
+        } catch(e) { window.showToast("Error updating profile", true); }
     }
 
     window.toggleBlockUser = async () => {
         if(!currentOpenUserId) return;
         const userIndex = allUsers.findIndex(u => u.id === currentOpenUserId);
         if(userIndex === -1) return;
-        
         const isCurrentlyBlocked = allUsers[userIndex].isBlocked || false;
         const newStatus = !isCurrentlyBlocked;
-        const actionWord = newStatus ? "BLOCK" : "UNBLOCK";
-
-        if(!confirm(`Are you sure you want to ${actionWord} this user?`)) return;
-
+        if(!confirm(`Are you sure you want to proceed?`)) return;
         try {
             await updateDoc(doc(db, "earnx_users", currentOpenUserId), { isBlocked: newStatus });
             allUsers[userIndex].isBlocked = newStatus;
-            
-            window.showToast(`User successfully ${actionWord}ED!`);
+            window.showToast(`Status Updated!`);
             window.openUserModal(currentOpenUserId); 
             window.refreshActiveTab(); 
-        } catch(e) {
-            window.showToast("Error updating status", true);
-        }
+        } catch(e) { window.showToast("Error", true); }
     }
 
     window.sendPersonalAlert = async () => {
         if(!currentOpenUserId) return;
-        
-        const alertMsg = prompt("Enter a Warning/Alert message for this user.\n(It will popup next time they open the app):");
-        if(alertMsg === null || alertMsg.trim() === "") return;
-
+        const alertMsg = prompt("Enter Warning Message:");
+        if(!alertMsg) return;
         try {
             await updateDoc(doc(db, "earnx_users", currentOpenUserId), { personalAlert: alertMsg.trim() });
-            window.showToast("Personal Alert Sent Successfully!");
-            const user = allUsers.find(u => u.id === currentOpenUserId);
-            if(user) {
-                let txs = Array.isArray(user.transactions) ? user.transactions : [];
-                txs.unshift({ title: "Admin Warning Sent", amount: 0, type: "spend", date: Date.now() });
-                if(txs.length > 50) txs.pop();
-                await updateDoc(doc(db, "earnx_users", currentOpenUserId), { transactions: txs });
-                user.transactions = txs;
-                window.openUserModal(currentOpenUserId); 
-            }
-        } catch(e) {
-            window.showToast("Error sending alert", true);
-        }
+            window.showToast("Alert Sent!");
+        } catch(e) { window.showToast("Error", true); }
     }
 
     window.editUserBalance = async (userId, currentCoins) => {
-        const val = prompt(`Current Balance: ${currentCoins} Coins\n\nEnter amount to ADD (e.g. 50000) or DEDUCT (e.g. -10000):`);
-        if(val === null || val.trim() === "") return;
-        
+        const val = prompt(`Current: ${currentCoins}\n\nEnter amount (+/-):`);
+        if(!val) return;
         const amount = parseInt(val);
-        if(isNaN(amount) || amount === 0) return window.showToast("Invalid number entered!", true);
-        
         const newBalance = currentCoins + amount;
-        if(newBalance < 0) return window.showToast("Balance cannot be less than 0!", true);
-        
-        if(!confirm(`Are you sure? This user's new balance will be ${newBalance} Coins.`)) return;
-        
+        if(!confirm(`Confirm new balance: ${newBalance}?`)) return;
         try {
             const userRef = doc(db, "earnx_users", userId);
             const userSnap = await getDoc(userRef);
-            
             if(userSnap.exists()) {
                 const userData = userSnap.data();
                 let txs = Array.isArray(userData.transactions) ? userData.transactions : [];
-                const txType = amount > 0 ? "earn" : "spend";
-                const newTx = { title: "Admin Adjustment", amount: Math.abs(amount), type: txType, date: Date.now() };
-
-                txs.unshift(newTx);
+                txs.unshift({ title: "Admin Adjustment", amount: Math.abs(amount), type: amount > 0 ? "earn" : "spend", date: Date.now() });
                 if(txs.length > 50) txs.pop();
-                
                 await updateDoc(userRef, { coins: newBalance, transactions: txs });
-                
                 const localUser = allUsers.find(u => u.id === userId);
                 if(localUser) { localUser.coins = newBalance; localUser.transactions = txs; }
-                
-                window.showToast("Balance Updated Successfully!");
+                window.showToast("Updated!");
                 window.refreshActiveTab(); 
             }
-        } catch(e) { window.showToast("Error updating balance", true); }
+        } catch(e) { window.showToast("Error", true); }
     }
 
     window.approveReq = async (docId) => {
-        if(!confirm("Are you sure you want to APPROVE this payment?")) return;
-        try {
-            await updateDoc(doc(db, "earnx_withdrawals", docId), { status: "Approved" });
-            window.showToast("Payment Approved!");
-            window.loadDashboardData(); 
-        } catch(e) { window.showToast("Error approving", true); }
+        if(!confirm("Approve?")) return;
+        try { await updateDoc(doc(db, "earnx_withdrawals", docId), { status: "Approved" }); window.loadDashboardData(); } catch(e) { window.showToast("Error", true); }
     }
 
     window.rejectReq = async (docId, userId, coinAmount) => {
-        const reason = prompt("Enter reason for rejection (e.g. Invalid UPI, Cheating):");
+        const reason = prompt("Reason:");
         if(reason === null) return; 
-        
         try {
             await updateDoc(doc(db, "earnx_withdrawals", docId), { status: "Rejected", reason: reason || "Admin Rejected" });
             const userRef = doc(db, "earnx_users", userId);
             const userSnap = await getDoc(userRef);
-            
             if(userSnap.exists()) {
                 const userData = userSnap.data();
                 const newBalance = (Number(userData.coins) || 0) + coinAmount;
                 let txs = Array.isArray(userData.transactions) ? userData.transactions : [];
-                txs.unshift({ title: "Refund: " + (reason || "Withdrawal Rejected"), amount: coinAmount, type: "earn", date: Date.now() });
-                if(txs.length > 50) txs.pop();
-                
+                txs.unshift({ title: "Refund: Withdrawal Rejected", amount: coinAmount, type: "earn", date: Date.now() });
                 await updateDoc(userRef, { coins: newBalance, transactions: txs });
             }
-
-            window.showToast("Rejected & Coins Refunded to User!");
             window.loadDashboardData(); 
-
-        } catch(e) { window.showToast("Error processing reject", true); }
+        } catch(e) { window.showToast("Error", true); }
     }
 
     window.findFakeUsers = () => {
-        if (!allUsers || allUsers.length === 0) {
-            document.getElementById("fakeAlertBox").innerHTML = "<span style='color: var(--warning);'>⚠️ Please wait for user data to load first!</span>";
-            return;
-        }
-
+        if (!allUsers || allUsers.length === 0) return;
         let deviceCount = {};
-        let outputHTML = "<hr style='border-color: var(--card-border); margin: 15px 0;'><h4 style='color: var(--danger); margin-bottom: 10px;'>Fake Accounts Found (Same Device ID):</h4>";
+        let outputHTML = "<hr style='border-color: var(--card-border); margin: 15px 0;'><h4 style='color: var(--danger); margin-bottom: 10px;'>Fake Accounts:</h4>";
         let foundFake = false;
-
         allUsers.forEach(user => {
             let id = user.deviceId; 
-            
             if(id && id.trim() !== "") { 
-                let userInfo = `<b>${user.profile?.name || 'Unknown'}</b> (Coins: ${user.coins || 0}) <br><span style='font-size:0.75rem; color:var(--text-muted);'>ID: ${user.id}</span>`;
-                
-                if(deviceCount[id]) {
-                    deviceCount[id].push(userInfo);
-                } else {
-                    deviceCount[id] = [userInfo];
-                }
+                let uName = user.profile?.name || 'Unknown';
+                if(user.profile?.refCode === "JRZZ1945") uName = "👑 Admin";
+                let userInfo = `<b>${uName}</b> (Coins: ${user.coins || 0}) <br><span style='font-size:0.75rem; color:var(--text-muted);'>ID: ${user.id.substring(0,8)}...</span>`;
+                if(deviceCount[id]) deviceCount[id].push(userInfo); else deviceCount[id] = [userInfo];
             }
         });
-
         for (let deviceId in deviceCount) {
             if(deviceCount[deviceId].length > 1) {
                 foundFake = true;
-                outputHTML += `
-                <div style="background: var(--bg-dark); padding: 10px; border-left: 4px solid var(--danger); margin-bottom: 10px; border-radius: 4px;">
-                    <span style="color: var(--warning); font-size: 0.8rem; margin-bottom: 5px; display: block;"><i class="fa-solid fa-mobile-screen"></i> Device ID: ${deviceId}</span>
-                    <div style="margin-left: 10px; padding-left: 10px; border-left: 1px dashed var(--card-border);">
-                        👉 ${deviceCount[deviceId].join('<br><br> 👉 ')}
-                    </div>
-                </div>`;
+                outputHTML += `<div style="background: var(--bg-dark); padding: 10px; border-left: 4px solid var(--danger); margin-bottom: 10px; border-radius: 4px;"><span style="color: var(--warning); font-size: 0.8rem;">Device ID: ${deviceId}</span><div style="margin-top:5px; margin-left: 10px; border-left: 1px dashed var(--card-border); padding-left: 10px;">👉 ${deviceCount[deviceId].join('<br><br> 👉 ')}</div></div>`;
             }
         }
-
-        if(!foundFake) {
-            outputHTML = "<p style='color: var(--primary); font-weight: bold;'><i class='fa-solid fa-circle-check'></i> All clean! No fake accounts detected.</p>";
-        }
-
-        document.getElementById("fakeAlertBox").innerHTML = outputHTML;
+        document.getElementById("fakeAlertBox").innerHTML = foundFake ? outputHTML : "<p style='color: var(--primary);'>✅ No fake accounts detected.</p>";
     }
-
 </script>
 </body>
 </html>
