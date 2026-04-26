@@ -145,7 +145,7 @@
             </div>
 
             <div style="background: var(--bg-dark); padding: 15px; border-radius: 10px; border: 1px solid var(--card-border); margin-bottom: 20px;">
-                <h3 style="font-size: 0.9rem; color: var(--info); margin-bottom: 10px;"><i class="fa-solid fa-user-pen"></i> Admin Profile Edit</h3>
+                <h3 style="font-size: 0.9rem; color: var(--info); margin-bottom: 10px;"><i class="fa-solid fa-user-pen"></i> Server Profile Force Edit</h3>
                 <input type="text" id="admin-edit-name" placeholder="Full Name" style="width: 100%; padding: 10px; margin-bottom: 10px; border-radius: 6px; background: var(--bg-darker); border: 1px solid var(--card-border); color: white; outline: none;">
                 <input type="text" id="admin-edit-phone" placeholder="Phone/UPI Number" style="width: 100%; padding: 10px; margin-bottom: 10px; border-radius: 6px; background: var(--bg-darker); border: 1px solid var(--card-border); color: white; outline: none;">
                 <button class="btn btn-info btn-small" onclick="adminSaveProfile()"><i class="fa-solid fa-floppy-disk"></i> Force Save Profile</button>
@@ -213,7 +213,7 @@
             <div class="tab" onclick="switchTab('referrals')" id="tab-referrals">Referrals</div>
             <div class="tab" onclick="switchTab('ref-leaderboard')" id="tab-ref-leaderboard">Top Referrers</div>
             <div class="tab" onclick="switchTab('leaderboard')" id="tab-leaderboard">Coins Leaderboard</div>
-            <div class="tab" onclick="switchTab('admin-logs')" id="tab-admin-logs" style="border: 1px solid var(--info); color: var(--info);">🛡️ Admin Logs</div>
+            <div class="tab" onclick="switchTab('admin-logs')" id="tab-admin-logs" style="border: 1px solid var(--info); color: var(--info);">🛡️ Server Logs</div>
             <div class="tab" onclick="switchTab('settings')" id="tab-settings" style="border: 1px solid var(--warning); color: var(--warning);">⚙️ App Settings</div>
         </div>
 
@@ -308,8 +308,8 @@
 
         <div class="table-container" id="sec-admin-logs">
             <div style="padding: 20px; background: var(--bg-dark); border-bottom: 1px solid var(--card-border);">
-                <h3 style="color: var(--info);"><i class="fa-solid fa-shield-halved"></i> Admin Activity Logs</h3>
-                <p style="color: var(--text-muted); font-size: 0.85rem;">Record of all actions taken by Admin (Alerts, Bans, Notices, etc.)</p>
+                <h3 style="color: var(--info);"><i class="fa-solid fa-shield-halved"></i> Server Activity Logs</h3>
+                <p style="color: var(--text-muted); font-size: 0.85rem;">Record of all actions taken by Server (Alerts, Bans, Notices, etc.)</p>
             </div>
             <table>
                 <thead>
@@ -419,7 +419,7 @@
                 timestamp: Date.now()
             });
         } catch(e) {
-            console.log("Admin log save failed", e);
+            console.log("Server log save failed", e);
         }
     };
 
@@ -550,7 +550,7 @@
     function renderAdminLogs() {
         const tbody = document.getElementById('tbody-admin-logs'); tbody.innerHTML = '';
         if(adminLogsData.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;">No admin actions recorded yet.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;">No server actions recorded yet.</td></tr>`;
             return;
         }
 
@@ -593,7 +593,7 @@
                 <td data-label="User ID">...${w.userId.substring(0,8)}</td>
                 <td data-label="UPI ID">${w.upiId}</td>
                 <td data-label="Amount">₹${((w.coins / 10000) * 100).toFixed(2)}</td>
-                <td data-label="Status"><span class="badge ${w.status === 'Approved' ? 'badge-approved' : (w.status === 'Rejected' ? 'badge-rejected' : 'badge-pending')}">${w.status}</span></td>
+                <td data-label="Status"><span class="badge ${w.status === 'Approved' ? 'badge-approved' : (w.status === 'Rejected' ? 'badge-rejected' : 'badge-pending')}">${w.status === 'Rejected' ? 'Rejected by Server' : w.status}</span></td>
                 <td data-label="Action">${actionHtml}</td>
             `;
             tbody.appendChild(tr);
@@ -730,25 +730,16 @@
         });
     }
 
+    // 🚀 NEW LEADERBOARD LOGIC 
     function renderLeaderboard() {
         const tbody = document.getElementById('tbody-leaderboard'); tbody.innerHTML = '';
-
-        let withdrawTotals = {};
-        allWithdrawals.forEach(w => {
-            if(w.status === "Pending" || w.status === "Approved") {
-                if(!withdrawTotals[w.userId]) {
-                    withdrawTotals[w.userId] = 0;
-                }
-                withdrawTotals[w.userId] += Number(w.coins);
-            }
-        });
 
         let usersWithLifetime = allUsers
             .filter(u => !u.isBlocked)
             .map(u => {
-                let currentCoins = Number(u.coins) || 0;
-                let withdrawnCoins = withdrawTotals[u.id] || 0;
-                return { ...u, lifetimeCoins: currentCoins + withdrawnCoins };
+                // Fallback to existing coins if lifetimeCoins is not yet registered for older users
+                let lifeCoins = Number(u.lifetimeCoins) || Number(u.coins) || 0;
+                return { ...u, lifetimeCoins: lifeCoins };
             })
             .filter(u => u.lifetimeCoins > 0);
 
@@ -812,7 +803,7 @@
         
         if(user.transactions && Array.isArray(user.transactions) && user.transactions.length > 0) {
             const sortedTx = [...user.transactions].sort((a,b) => getSafeMs(b.date) - getSafeMs(a.date));
-            taskCount = sortedTx.filter(t => t.type === 'earn' && t.title !== 'Admin Adjustment').length;
+            taskCount = sortedTx.filter(t => t.type === 'earn' && t.title !== 'Server Adjustment').length;
             lastActive = formatFullTime(sortedTx[0].date);
 
             sortedTx.forEach(t => {
@@ -845,7 +836,7 @@
                 "profile.phone": newPhone
             });
             window.showToast("Profile Updated Successfully!");
-            window.logAdminAction("Profile Edit", `Changed profile info for user ID: ${currentOpenUserId}`);
+            window.logAdminAction("Profile Edit", `Server modified profile info for user ID: ${currentOpenUserId}`);
         } catch(e) {
             window.showToast("Error updating profile", true);
         }
@@ -865,7 +856,7 @@
         try {
             await updateDoc(doc(db, "earnx_users", currentOpenUserId), { isBlocked: newStatus });
             window.showToast(`User successfully ${actionWord}ED!`);
-            window.logAdminAction(`User ${actionWord}`, `Admin marked user ID ${currentOpenUserId} as ${newStatus ? 'Blocked' : 'Active'}`);
+            window.logAdminAction(`User ${actionWord}`, `Server marked user ID ${currentOpenUserId} as ${newStatus ? 'Blocked' : 'Active'}`);
         } catch(e) {
             window.showToast("Error updating status", true);
         }
@@ -884,7 +875,8 @@
             const user = allUsers.find(u => u.id === currentOpenUserId);
             if(user) {
                 let txs = Array.isArray(user.transactions) ? user.transactions : [];
-                txs.unshift({ title: "Admin Warning Sent", amount: 0, type: "spend", date: Date.now() });
+                // 🚀 BRANDING UPDATE
+                txs.unshift({ title: "Server Warning Sent", amount: 0, type: "spend", date: Date.now() });
                 if(txs.length > 50) txs.pop();
                 await updateDoc(doc(db, "earnx_users", currentOpenUserId), { transactions: txs });
                 window.logAdminAction("Personal Alert", `Sent to user ${user.profile?.name || currentOpenUserId}. Msg: "${alertMsg}"`);
@@ -914,7 +906,8 @@
                 const userData = userSnap.data();
                 let txs = Array.isArray(userData.transactions) ? userData.transactions : [];
                 const txType = amount > 0 ? "earn" : "spend";
-                const newTx = { title: "Admin Adjustment", amount: Math.abs(amount), type: txType, date: Date.now() };
+                // 🚀 BRANDING UPDATE
+                const newTx = { title: "Server Adjustment", amount: Math.abs(amount), type: txType, date: Date.now() };
 
                 txs.unshift(newTx);
                 if(txs.length > 50) txs.pop();
@@ -940,7 +933,8 @@
         if(reason === null) return; 
         
         try {
-            await updateDoc(doc(db, "earnx_withdrawals", docId), { status: "Rejected", reason: reason || "Admin Rejected" });
+            // 🚀 BRANDING UPDATE
+            await updateDoc(doc(db, "earnx_withdrawals", docId), { status: "Rejected", reason: reason || "Server Rejected" });
             const userRef = doc(db, "earnx_users", userId);
             const userSnap = await getDoc(userRef);
             
@@ -948,7 +942,8 @@
                 const userData = userSnap.data();
                 const newBalance = (Number(userData.coins) || 0) + coinAmount;
                 let txs = Array.isArray(userData.transactions) ? userData.transactions : [];
-                txs.unshift({ title: "Refund: " + (reason || "Withdrawal Rejected"), amount: coinAmount, type: "earn", date: Date.now() });
+                // 🚀 BRANDING UPDATE
+                txs.unshift({ title: "Refund: " + (reason || "Withdrawal Rejected by Server"), amount: coinAmount, type: "earn", date: Date.now() });
                 if(txs.length > 50) txs.pop();
                 
                 await updateDoc(userRef, { coins: newBalance, transactions: txs });
@@ -973,7 +968,8 @@
                 const userData = userSnap.data();
                 const newBalance = (Number(userData.coins) || 0) + coinAmount;
                 let txs = Array.isArray(userData.transactions) ? userData.transactions : [];
-                txs.unshift({ title: "Refund (Reversed): " + reason, amount: coinAmount, type: "earn", date: Date.now() });
+                // 🚀 BRANDING UPDATE
+                txs.unshift({ title: "Refund (Reversed by Server): " + reason, amount: coinAmount, type: "earn", date: Date.now() });
                 if(txs.length > 50) txs.pop();
                 
                 await updateDoc(userRef, { coins: newBalance, transactions: txs });
