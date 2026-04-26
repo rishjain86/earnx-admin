@@ -158,6 +158,7 @@
                 <div class="user-stat-box" style="border-color: #ec4899;"><span>Insta Task ID</span><b id="modal-insta">...</b></div>
                 <div class="user-stat-box"><span>Total Tasks Done</span><b id="modal-tasks-done">...</b></div>
                 <div class="user-stat-box"><span>Last Active Date</span><b id="modal-last-active">...</b></div>
+                <div class="user-stat-box" style="border-color: #10b981;"><span>Total Screen Time</span><b id="modal-screentime">...</b></div>
             </div>
 
             <h3 style="margin-top: 10px; margin-bottom: 10px; font-size: 1.1rem; border-bottom: 1px solid var(--card-border); padding-bottom: 10px;">Full Activity Log</h3>
@@ -214,8 +215,6 @@
             <div class="tab" onclick="switchTab('leaderboard')" id="tab-leaderboard">Coins Leaderboard</div>
             <div class="tab" onclick="switchTab('admin-logs')" id="tab-admin-logs" style="border: 1px solid var(--info); color: var(--info);">🛡️ Admin Logs</div>
             <div class="tab" onclick="switchTab('settings')" id="tab-settings" style="border: 1px solid var(--warning); color: var(--warning);">⚙️ App Settings</div>
-            
-            <button class="btn btn-small" style="margin-left: auto; background: var(--bg-dark); border: 1px solid var(--card-border);" onclick="loadDashboardData()">Refresh</button>
         </div>
 
         <div class="loader" id="main-loader"></div>
@@ -243,7 +242,7 @@
                     <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
                         <div>
                             <h3 style="margin-top: 0; color: var(--danger); font-size: 1.1rem;"><i class="fa-solid fa-user-ninja"></i> Fake Account Detector</h3>
-                            <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 5px;">Find multiple accounts created from the same mobile device.</p>
+                            <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 5px;">Scans for duplicate Device IDs, Facebook IDs, and Insta IDs.</p>
                         </div>
                         <button onclick="findFakeUsers()" class="btn btn-danger btn-small"><i class="fa-solid fa-magnifying-glass"></i> Scan For Fakes</button>
                     </div>
@@ -361,10 +360,9 @@
     </div>
 
 <script type="module">
-    // Added addDoc to imports for logging
     import { initializeApp } from "https://www.gstatic.com/firebasejs/12.12.0/firebase-app.js";
     import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.12.0/firebase-auth.js";
-    import { getFirestore, collection, getDocs, updateDoc, doc, getDoc, setDoc, addDoc } from "https://www.gstatic.com/firebasejs/12.12.0/firebase-firestore.js";
+    import { getFirestore, collection, getDocs, updateDoc, doc, getDoc, setDoc, addDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/12.12.0/firebase-firestore.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyCpS_rr77wh23C2LYl6xCSTyptMKlITauk",
@@ -382,9 +380,13 @@
 
     let allWithdrawals = [];
     let allUsers = [];
-    let adminLogsData = []; // Array for storing logs
+    let adminLogsData = []; 
     let currentTab = 'withdraw-pending';
     let currentOpenUserId = null; 
+
+    // Real-Time Listeners
+    let unsubUsers = null;
+    let unsubWithdrawals = null;
 
     const formatFullTime = (timestamp) => {
         if (!timestamp) return 'Unknown';
@@ -409,7 +411,6 @@
         setTimeout(() => { t.style.display = 'none'; }, 3000);
     }
 
-    // 🔥 NEW FUNCTION: Save Admin Action to Database 🔥
     window.logAdminAction = async (actionType, detailsText) => {
         try {
             await addDoc(collection(db, "earnx_admin_logs"), {
@@ -446,23 +447,36 @@
 
     window.loadDashboardData = async () => {
         document.getElementById('main-loader').style.display = 'block';
-        allWithdrawals = []; allUsers = []; adminLogsData = [];
-        try {
-            const userSnap = await getDocs(collection(db, "earnx_users"));
-            userSnap.forEach(doc => { let u = doc.data(); u.id = doc.id; allUsers.push(u); });
-            document.getElementById('stat-users').innerText = allUsers.length;
 
-            const wSnap = await getDocs(collection(db, "earnx_withdrawals"));
-            let pendingCount = 0; let totalPaidCoins = 0;
-            wSnap.forEach(doc => {
-                let data = doc.data(); data.docId = doc.id; allWithdrawals.push(data);
-                if(data.status === "Pending") pendingCount++;
-                if(data.status === "Approved") totalPaidCoins += data.coins;
+        // --- REAL TIME UPDATES FOR USERS ---
+        if (!unsubUsers) {
+            unsubUsers = onSnapshot(collection(db, "earnx_users"), (snap) => {
+                allUsers = [];
+                snap.forEach(doc => { let u = doc.data(); u.id = doc.id; allUsers.push(u); });
+                document.getElementById('stat-users').innerText = allUsers.length;
+                if(currentOpenUserId) window.openUserModal(currentOpenUserId); // Auto update modal if open
+                window.refreshActiveTab();
             });
-            allWithdrawals.sort((a,b) => getSafeMs(b.createdAt) - getSafeMs(a.createdAt));
-            document.getElementById('stat-pending').innerText = pendingCount;
-            document.getElementById('stat-paid').innerText = `₹${(totalPaidCoins / 10000) * 100}`;
-            
+        }
+
+        // --- REAL TIME UPDATES FOR WITHDRAWALS ---
+        if (!unsubWithdrawals) {
+            unsubWithdrawals = onSnapshot(collection(db, "earnx_withdrawals"), (snap) => {
+                allWithdrawals = [];
+                let pendingCount = 0; let totalPaidCoins = 0;
+                snap.forEach(doc => {
+                    let data = doc.data(); data.docId = doc.id; allWithdrawals.push(data);
+                    if(data.status === "Pending") pendingCount++;
+                    if(data.status === "Approved") totalPaidCoins += data.coins;
+                });
+                allWithdrawals.sort((a,b) => getSafeMs(b.createdAt) - getSafeMs(a.createdAt));
+                document.getElementById('stat-pending').innerText = pendingCount;
+                document.getElementById('stat-paid').innerText = `₹${(totalPaidCoins / 10000) * 100}`;
+                window.refreshActiveTab();
+            });
+        }
+
+        try {
             const noticeSnap = await getDoc(doc(db, "earnx_settings", "app_notice"));
             if(noticeSnap.exists()) {
                 document.getElementById('notice-status').value = noticeSnap.data().isActive ? "true" : "false";
@@ -474,15 +488,12 @@
                 document.getElementById('admin-promo-code').value = promoSnap.data().code || "";
             }
 
-            // Fetch Admin Logs
-            try {
-                const logsSnap = await getDocs(collection(db, "earnx_admin_logs"));
-                logsSnap.forEach(doc => { adminLogsData.push(doc.data()); });
-                adminLogsData.sort((a,b) => getSafeMs(b.timestamp) - getSafeMs(a.timestamp));
-            } catch(e) { console.log("No logs yet or read error"); }
-
-            window.refreshActiveTab();
-        } catch (e) { window.showToast("Error loading data", true); }
+            const logsSnap = await getDocs(collection(db, "earnx_admin_logs"));
+            adminLogsData = [];
+            logsSnap.forEach(doc => { adminLogsData.push(doc.data()); });
+            adminLogsData.sort((a,b) => getSafeMs(b.timestamp) - getSafeMs(a.timestamp));
+        } catch (e) { console.log("Error loading settings/logs"); }
+        
         document.getElementById('main-loader').style.display = 'none';
     }
 
@@ -494,11 +505,8 @@
         try {
             await setDoc(doc(db, "earnx_settings", "app_notice"), { isActive: status, message: msg, updatedAt: Date.now() });
             window.showToast("Global Notice Updated!");
-            
-            // Save to logs
             let logMsg = status ? `Updated Global Notice: "${msg.substring(0, 30)}..."` : "Turned OFF Global Notice";
             window.logAdminAction("Flash Message", logMsg);
-            
         } catch (error) { window.showToast("Error saving notice!", true); }
     };
 
@@ -567,13 +575,26 @@
         const filtered = allWithdrawals.filter(w => isPending ? w.status === 'Pending' : w.status !== 'Pending');
         filtered.forEach(w => {
             const tr = document.createElement('tr');
+            
+            // Reversal Button logic inside History Tab
+            let actionHtml = '';
+            if (isPending) {
+                actionHtml = `<div class="action-btns"><button class="btn btn-small" onclick="approveReq('${w.docId}', '${w.userId}', ${w.coins})"><i class="fa-solid fa-check"></i></button><button class="btn btn-danger btn-small" onclick="rejectReq('${w.docId}', '${w.userId}', ${w.coins})"><i class="fa-solid fa-times"></i></button></div>`;
+            } else {
+                if (w.status === 'Approved') {
+                    actionHtml = `<button class="btn btn-warning btn-small" onclick="reverseReq('${w.docId}', '${w.userId}', ${w.coins})"><i class="fa-solid fa-rotate-left"></i> Reverse</button>`;
+                } else {
+                    actionHtml = `-`;
+                }
+            }
+
             tr.innerHTML = `
                 <td data-label="Date & Time"><span style="font-size: 0.8rem; font-weight: 600; color: white;">${formatFullTime(w.createdAt)}</span></td>
                 <td data-label="User ID">...${w.userId.substring(0,8)}</td>
                 <td data-label="UPI ID">${w.upiId}</td>
                 <td data-label="Amount">₹${((w.coins / 10000) * 100).toFixed(2)}</td>
                 <td data-label="Status"><span class="badge ${w.status === 'Approved' ? 'badge-approved' : (w.status === 'Rejected' ? 'badge-rejected' : 'badge-pending')}">${w.status}</span></td>
-                ${isPending ? `<td data-label="Action"><div class="action-btns"><button class="btn btn-small" onclick="approveReq('${w.docId}', '${w.userId}', ${w.coins})"><i class="fa-solid fa-check"></i></button><button class="btn btn-danger btn-small" onclick="rejectReq('${w.docId}', '${w.userId}', ${w.coins})"><i class="fa-solid fa-times"></i></button></div></td>` : '<td style="display:none;"></td>'}
+                <td data-label="Action">${actionHtml}</td>
             `;
             tbody.appendChild(tr);
         });
@@ -727,10 +748,7 @@
             .map(u => {
                 let currentCoins = Number(u.coins) || 0;
                 let withdrawnCoins = withdrawTotals[u.id] || 0;
-                return {
-                    ...u,
-                    lifetimeCoins: currentCoins + withdrawnCoins
-                };
+                return { ...u, lifetimeCoins: currentCoins + withdrawnCoins };
             })
             .filter(u => u.lifetimeCoins > 0);
 
@@ -783,6 +801,12 @@
         document.getElementById('modal-fb').innerText = (user.tasks && user.tasks.lastFbId) ? user.tasks.lastFbId : "Not Provided";
         document.getElementById('modal-insta').innerText = (user.tasks && user.tasks.lastInstaId) ? user.tasks.lastInstaId : "Not Provided";
         
+        // SCREEN TIME
+        const screenTimeSec = user.screenTime || 0;
+        const hours = Math.floor(screenTimeSec / 3600);
+        const minutes = Math.floor((screenTimeSec % 3600) / 60);
+        document.getElementById('modal-screentime').innerText = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+
         let taskCount = 0; let lastActive = "Never";
         const txList = document.getElementById('modal-tx-list'); txList.innerHTML = '';
         
@@ -820,19 +844,8 @@
                 "profile.name": newName,
                 "profile.phone": newPhone
             });
-            
-            const userIndex = allUsers.findIndex(u => u.id === currentOpenUserId);
-            if(userIndex !== -1) {
-                if(!allUsers[userIndex].profile) allUsers[userIndex].profile = {};
-                allUsers[userIndex].profile.name = newName;
-                allUsers[userIndex].profile.phone = newPhone;
-            }
-
-            document.getElementById('modal-user-name').innerText = newName || 'Unknown User';
             window.showToast("Profile Updated Successfully!");
             window.logAdminAction("Profile Edit", `Changed profile info for user ID: ${currentOpenUserId}`);
-            window.refreshActiveTab(); 
-
         } catch(e) {
             window.showToast("Error updating profile", true);
         }
@@ -851,12 +864,8 @@
 
         try {
             await updateDoc(doc(db, "earnx_users", currentOpenUserId), { isBlocked: newStatus });
-            allUsers[userIndex].isBlocked = newStatus;
-            
             window.showToast(`User successfully ${actionWord}ED!`);
             window.logAdminAction(`User ${actionWord}`, `Admin marked user ID ${currentOpenUserId} as ${newStatus ? 'Blocked' : 'Active'}`);
-            window.openUserModal(currentOpenUserId); 
-            window.refreshActiveTab(); 
         } catch(e) {
             window.showToast("Error updating status", true);
         }
@@ -878,12 +887,7 @@
                 txs.unshift({ title: "Admin Warning Sent", amount: 0, type: "spend", date: Date.now() });
                 if(txs.length > 50) txs.pop();
                 await updateDoc(doc(db, "earnx_users", currentOpenUserId), { transactions: txs });
-                user.transactions = txs;
-                
-                // Save to Admin Logs
                 window.logAdminAction("Personal Alert", `Sent to user ${user.profile?.name || currentOpenUserId}. Msg: "${alertMsg}"`);
-                
-                window.openUserModal(currentOpenUserId); 
             }
         } catch(e) {
             window.showToast("Error sending alert", true);
@@ -916,25 +920,18 @@
                 if(txs.length > 50) txs.pop();
                 
                 await updateDoc(userRef, { coins: newBalance, transactions: txs });
-                
-                const localUser = allUsers.find(u => u.id === userId);
-                if(localUser) { localUser.coins = newBalance; localUser.transactions = txs; }
-                
                 window.showToast("Balance Updated Successfully!");
-                window.logAdminAction("Balance Edit", `User ${localUser.profile?.name || userId} balance changed by ${amount}. New total: ${newBalance}`);
-                window.refreshActiveTab(); 
+                window.logAdminAction("Balance Edit", `User balance changed by ${amount}. New total: ${newBalance} for ${userId}`);
             }
         } catch(e) { window.showToast("Error updating balance", true); }
     }
 
-    // Fixed function signature to accept userId and coinAmount
     window.approveReq = async (docId, userId, coinAmount) => {
         if(!confirm("Are you sure you want to APPROVE this payment?")) return;
         try {
             await updateDoc(doc(db, "earnx_withdrawals", docId), { status: "Approved" });
             window.showToast("Payment Approved!");
             window.logAdminAction("Withdrawal Approved", `Approved payout of ${coinAmount} coins for user ${userId}`);
-            window.loadDashboardData(); 
         } catch(e) { window.showToast("Error approving", true); }
     }
 
@@ -959,47 +956,75 @@
 
             window.showToast("Rejected & Coins Refunded to User!");
             window.logAdminAction("Withdrawal Rejected", `Rejected ${coinAmount} coins payout for user ${userId}. Reason: ${reason}`);
-            window.loadDashboardData(); 
-
         } catch(e) { window.showToast("Error processing reject", true); }
     }
 
+    // --- NEW FEATURE: REVERSE APPROVED WITHDRAWAL ---
+    window.reverseReq = async (docId, userId, coinAmount) => {
+        const reason = prompt("Enter reason for REVERSING this approved withdrawal:");
+        if(reason === null) return; 
+        
+        try {
+            await updateDoc(doc(db, "earnx_withdrawals", docId), { status: "Rejected", reason: "Reversed: " + reason });
+            const userRef = doc(db, "earnx_users", userId);
+            const userSnap = await getDoc(userRef);
+            
+            if(userSnap.exists()) {
+                const userData = userSnap.data();
+                const newBalance = (Number(userData.coins) || 0) + coinAmount;
+                let txs = Array.isArray(userData.transactions) ? userData.transactions : [];
+                txs.unshift({ title: "Refund (Reversed): " + reason, amount: coinAmount, type: "earn", date: Date.now() });
+                if(txs.length > 50) txs.pop();
+                
+                await updateDoc(userRef, { coins: newBalance, transactions: txs });
+            }
+
+            window.showToast("Withdrawal Reversed & Coins Refunded!");
+            window.logAdminAction("Withdrawal Reversed", `Reversed ${coinAmount} coins payout for user ${userId}. Reason: ${reason}`);
+        } catch(e) { window.showToast("Error processing reverse", true); }
+    }
+
+    // --- UPGRADED FAKE ACCOUNT DETECTOR ---
     window.findFakeUsers = () => {
         if (!allUsers || allUsers.length === 0) {
             document.getElementById("fakeAlertBox").innerHTML = "<span style='color: var(--warning);'>⚠️ Please wait for user data to load first!</span>";
             return;
         }
 
-        let deviceCount = {};
-        let outputHTML = "<hr style='border-color: var(--card-border); margin: 15px 0;'><h4 style='color: var(--danger); margin-bottom: 10px;'>Fake Accounts Found (Same Device ID):</h4>";
+        let deviceCount = {}; let fbCount = {}; let instaCount = {};
+        let outputHTML = "<hr style='border-color: var(--card-border); margin: 15px 0;'><h4 style='color: var(--danger); margin-bottom: 10px;'>Fake Accounts Detected:</h4>";
         let foundFake = false;
 
         allUsers.forEach(user => {
             let id = user.deviceId; 
+            let fb = user.tasks?.lastFbId;
+            let insta = user.tasks?.lastInstaId;
+            let userInfo = `<b>${user.profile?.name || 'Unknown'}</b> (Coins: ${user.coins || 0}) <br><span style='font-size:0.75rem; color:var(--text-muted);'>ID: ${user.id}</span>`;
             
-            if(id && id.trim() !== "") { 
-                let userInfo = `<b>${user.profile?.name || 'Unknown'}</b> (Coins: ${user.coins || 0}) <br><span style='font-size:0.75rem; color:var(--text-muted);'>ID: ${user.id}</span>`;
-                
-                if(deviceCount[id]) {
-                    deviceCount[id].push(userInfo);
-                } else {
-                    deviceCount[id] = [userInfo];
-                }
-            }
+            if(id && id.trim() !== "") { deviceCount[id] = deviceCount[id] || []; deviceCount[id].push(userInfo); }
+            if(fb && fb.trim() !== "") { let f = fb.toLowerCase().trim(); fbCount[f] = fbCount[f] || []; fbCount[f].push(userInfo); }
+            if(insta && insta.trim() !== "") { let i = insta.toLowerCase().trim(); instaCount[i] = instaCount[i] || []; instaCount[i].push(userInfo); }
         });
 
-        for (let deviceId in deviceCount) {
-            if(deviceCount[deviceId].length > 1) {
-                foundFake = true;
-                outputHTML += `
-                <div style="background: var(--bg-dark); padding: 10px; border-left: 4px solid var(--danger); margin-bottom: 10px; border-radius: 4px;">
-                    <span style="color: var(--warning); font-size: 0.8rem; margin-bottom: 5px; display: block;"><i class="fa-solid fa-mobile-screen"></i> Device ID: ${deviceId}</span>
-                    <div style="margin-left: 10px; padding-left: 10px; border-left: 1px dashed var(--card-border);">
-                        👉 ${deviceCount[deviceId].join('<br><br> 👉 ')}
-                    </div>
-                </div>`;
+        const renderDuplicates = (countObj, title, icon) => {
+            for (let key in countObj) {
+                if(countObj[key].length > 1) {
+                    foundFake = true;
+                    let usersList = countObj[key].join('<br><br> 👉 ');
+                    outputHTML += `
+                    <div style="background: var(--bg-dark); padding: 10px; border-left: 4px solid var(--danger); margin-bottom: 10px; border-radius: 4px;">
+                        <span style="color: var(--warning); font-size: 0.8rem; margin-bottom: 5px; display: block;"><i class="${icon}"></i> ${title}: ${key}</span>
+                        <div style="margin-left: 10px; padding-left: 10px; border-left: 1px dashed var(--card-border);">
+                            👉 ${usersList}
+                        </div>
+                    </div>`;
+                }
             }
-        }
+        };
+
+        renderDuplicates(deviceCount, "Device ID", "fa-solid fa-mobile-screen");
+        renderDuplicates(fbCount, "Facebook ID", "fa-brands fa-facebook");
+        renderDuplicates(instaCount, "Instagram ID", "fa-brands fa-instagram");
 
         if(!foundFake) {
             outputHTML = "<p style='color: var(--primary); font-weight: bold;'><i class='fa-solid fa-circle-check'></i> All clean! No fake accounts detected.</p>";
