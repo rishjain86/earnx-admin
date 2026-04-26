@@ -730,15 +730,32 @@
         });
     }
 
-    // 🚀 NEW LEADERBOARD LOGIC 
+        // 🚀 FIXED LEADERBOARD LOGIC
     function renderLeaderboard() {
         const tbody = document.getElementById('tbody-leaderboard'); tbody.innerHTML = '';
 
+        // Step 1: Purane users ke withdrawals calculate karo
+        let withdrawTotals = {};
+        allWithdrawals.forEach(w => {
+            if(w.status === "Pending" || w.status === "Approved") {
+                if(!withdrawTotals[w.userId]) {
+                    withdrawTotals[w.userId] = 0;
+                }
+                withdrawTotals[w.userId] += Number(w.coins);
+            }
+        });
+
+        // Step 2: Lifetime Coins ka sahi hisaab
         let usersWithLifetime = allUsers
             .filter(u => !u.isBlocked)
             .map(u => {
-                // Fallback to existing coins if lifetimeCoins is not yet registered for older users
-                let lifeCoins = Number(u.lifetimeCoins) || Number(u.coins) || 0;
+                let currentCoins = Number(u.coins) || 0;
+                let withdrawnCoins = withdrawTotals[u.id] || 0;
+                let oldSystemLifetime = currentCoins + withdrawnCoins;
+                
+                // Agar database ka lifetimeCoins purane calculation se kam hai, toh purana hisaab use karo (for older users)
+                let lifeCoins = Number(u.lifetimeCoins) > oldSystemLifetime ? Number(u.lifetimeCoins) : oldSystemLifetime;
+                
                 return { ...u, lifetimeCoins: lifeCoins };
             })
             .filter(u => u.lifetimeCoins > 0);
@@ -761,6 +778,7 @@
             tbody.appendChild(tr);
         });
     }
+
 
     window.openUserModal = (userId) => {
         const user = allUsers.find(u => u.id === userId); if(!user) return;
