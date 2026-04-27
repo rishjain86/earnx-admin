@@ -730,33 +730,30 @@
         });
     }
 
-        // 🚀 FIXED LEADERBOARD LOGIC
+            // 🚀 BULLETPROOF LEADERBOARD LOGIC
     function renderLeaderboard() {
         const tbody = document.getElementById('tbody-leaderboard'); tbody.innerHTML = '';
 
-        // Step 1: Purane users ke withdrawals calculate karo
+        // Step 1: Har user ke sirf Approved aur Pending withdrawals ko jodo (Rejected wale wapas current balance me chale jate hain)
         let withdrawTotals = {};
         allWithdrawals.forEach(w => {
             if(w.status === "Pending" || w.status === "Approved") {
-                if(!withdrawTotals[w.userId]) {
-                    withdrawTotals[w.userId] = 0;
-                }
-                withdrawTotals[w.userId] += Number(w.coins);
+                if(!withdrawTotals[w.userId]) { withdrawTotals[w.userId] = 0; }
+                withdrawTotals[w.userId] += Number(w.coins) || 0;
             }
         });
 
-        // Step 2: Lifetime Coins ka sahi hisaab
+        // Step 2: Pure Math -> Current Coins + Withdrawn Coins
         let usersWithLifetime = allUsers
             .filter(u => !u.isBlocked)
             .map(u => {
                 let currentCoins = Number(u.coins) || 0;
                 let withdrawnCoins = withdrawTotals[u.id] || 0;
-                let oldSystemLifetime = currentCoins + withdrawnCoins;
                 
-                // Agar database ka lifetimeCoins purane calculation se kam hai, toh purana hisaab use karo (for older users)
-                let lifeCoins = Number(u.lifetimeCoins) > oldSystemLifetime ? Number(u.lifetimeCoins) : oldSystemLifetime;
+                // Fail-proof calculation (Database field ko ignore karo, pure math use karo)
+                let finalLifetime = currentCoins + withdrawnCoins;
                 
-                return { ...u, lifetimeCoins: lifeCoins };
+                return { ...u, lifetimeCoins: finalLifetime };
             })
             .filter(u => u.lifetimeCoins > 0);
 
@@ -778,7 +775,6 @@
             tbody.appendChild(tr);
         });
     }
-
 
     window.openUserModal = (userId) => {
         const user = allUsers.find(u => u.id === userId); if(!user) return;
