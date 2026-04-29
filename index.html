@@ -225,8 +225,8 @@
                     <tr>
                         <th>Date & Time</th>
                         <th>User ID</th>
-                        <th>UPI ID</th>
-                        <th>Amount</th>
+                        <th>Target (Email/UPI)</th>
+                        <th>Amount & Type</th>
                         <th>Status</th>
                         <th id="th-action">Action</th>
                     </tr>
@@ -384,7 +384,6 @@
     let currentTab = 'withdraw-pending';
     let currentOpenUserId = null; 
 
-    // Real-Time Listeners
     let unsubUsers = null;
     let unsubWithdrawals = null;
 
@@ -448,18 +447,16 @@
     window.loadDashboardData = async () => {
         document.getElementById('main-loader').style.display = 'block';
 
-        // --- REAL TIME UPDATES FOR USERS ---
         if (!unsubUsers) {
             unsubUsers = onSnapshot(collection(db, "earnx_users"), (snap) => {
                 allUsers = [];
                 snap.forEach(doc => { let u = doc.data(); u.id = doc.id; allUsers.push(u); });
                 document.getElementById('stat-users').innerText = allUsers.length;
-                if(currentOpenUserId) window.openUserModal(currentOpenUserId); // Auto update modal if open
+                if(currentOpenUserId) window.openUserModal(currentOpenUserId); 
                 window.refreshActiveTab();
             });
         }
 
-        // --- REAL TIME UPDATES FOR WITHDRAWALS ---
         if (!unsubWithdrawals) {
             unsubWithdrawals = onSnapshot(collection(db, "earnx_withdrawals"), (snap) => {
                 allWithdrawals = [];
@@ -569,14 +566,15 @@
         });
     }
 
+    // 🚀 UPDATED WITHDRAWALS RENDER LOGIC FOR GIFT CARDS
     function renderWithdrawals() {
         const tbody = document.getElementById('tbody-withdrawals'); tbody.innerHTML = '';
         const isPending = currentTab === 'withdraw-pending';
         const filtered = allWithdrawals.filter(w => isPending ? w.status === 'Pending' : w.status !== 'Pending');
+        
         filtered.forEach(w => {
             const tr = document.createElement('tr');
             
-            // Reversal Button logic inside History Tab
             let actionHtml = '';
             if (isPending) {
                 actionHtml = `<div class="action-btns"><button class="btn btn-small" onclick="approveReq('${w.docId}', '${w.userId}', ${w.coins})"><i class="fa-solid fa-check"></i></button><button class="btn btn-danger btn-small" onclick="rejectReq('${w.docId}', '${w.userId}', ${w.coins})"><i class="fa-solid fa-times"></i></button></div>`;
@@ -588,11 +586,15 @@
                 }
             }
 
+            // Fallback for old UPI records vs new Email/GiftCard records
+            let targetContact = w.email ? w.email : (w.upiId || "N/A");
+            let payoutMethod = w.payoutMethod ? `<span style="color:var(--primary); font-weight:bold;">${w.payoutMethod}</span>` : `<span style="color:var(--info); font-weight:bold;">UPI</span>`;
+
             tr.innerHTML = `
                 <td data-label="Date & Time"><span style="font-size: 0.8rem; font-weight: 600; color: white;">${formatFullTime(w.createdAt)}</span></td>
                 <td data-label="User ID">...${w.userId.substring(0,8)}</td>
-                <td data-label="UPI ID">${w.upiId}</td>
-                <td data-label="Amount">₹${((w.coins / 10000) * 100).toFixed(2)}</td>
+                <td data-label="Target">${targetContact}</td>
+                <td data-label="Amount & Type">₹${((w.coins / 10000) * 100).toFixed(2)}<br>${payoutMethod}</td>
                 <td data-label="Status"><span class="badge ${w.status === 'Approved' ? 'badge-approved' : (w.status === 'Rejected' ? 'badge-rejected' : 'badge-pending')}">${w.status === 'Rejected' ? 'Rejected by Server' : w.status}</span></td>
                 <td data-label="Action">${actionHtml}</td>
             `;
@@ -730,11 +732,9 @@
         });
     }
 
-            // 🚀 BULLETPROOF LEADERBOARD LOGIC
     function renderLeaderboard() {
         const tbody = document.getElementById('tbody-leaderboard'); tbody.innerHTML = '';
 
-        // Step 1: Har user ke sirf Approved aur Pending withdrawals ko jodo (Rejected wale wapas current balance me chale jate hain)
         let withdrawTotals = {};
         allWithdrawals.forEach(w => {
             if(w.status === "Pending" || w.status === "Approved") {
@@ -743,16 +743,12 @@
             }
         });
 
-        // Step 2: Pure Math -> Current Coins + Withdrawn Coins
         let usersWithLifetime = allUsers
             .filter(u => !u.isBlocked)
             .map(u => {
                 let currentCoins = Number(u.coins) || 0;
                 let withdrawnCoins = withdrawTotals[u.id] || 0;
-                
-                // Fail-proof calculation (Database field ko ignore karo, pure math use karo)
                 let finalLifetime = currentCoins + withdrawnCoins;
-                
                 return { ...u, lifetimeCoins: finalLifetime };
             })
             .filter(u => u.lifetimeCoins > 0);
@@ -806,7 +802,6 @@
         document.getElementById('modal-fb').innerText = (user.tasks && user.tasks.lastFbId) ? user.tasks.lastFbId : "Not Provided";
         document.getElementById('modal-insta').innerText = (user.tasks && user.tasks.lastInstaId) ? user.tasks.lastInstaId : "Not Provided";
         
-        // SCREEN TIME
         const screenTimeSec = user.screenTime || 0;
         const hours = Math.floor(screenTimeSec / 3600);
         const minutes = Math.floor((screenTimeSec % 3600) / 60);
@@ -889,7 +884,6 @@
             const user = allUsers.find(u => u.id === currentOpenUserId);
             if(user) {
                 let txs = Array.isArray(user.transactions) ? user.transactions : [];
-                // 🚀 BRANDING UPDATE
                 txs.unshift({ title: "Server Warning Sent", amount: 0, type: "spend", date: Date.now() });
                 if(txs.length > 50) txs.pop();
                 await updateDoc(doc(db, "earnx_users", currentOpenUserId), { transactions: txs });
@@ -920,7 +914,6 @@
                 const userData = userSnap.data();
                 let txs = Array.isArray(userData.transactions) ? userData.transactions : [];
                 const txType = amount > 0 ? "earn" : "spend";
-                // 🚀 BRANDING UPDATE
                 const newTx = { title: "Server Adjustment", amount: Math.abs(amount), type: txType, date: Date.now() };
 
                 txs.unshift(newTx);
@@ -943,11 +936,10 @@
     }
 
     window.rejectReq = async (docId, userId, coinAmount) => {
-        const reason = prompt("Enter reason for rejection (e.g. Invalid UPI, Cheating):");
+        const reason = prompt("Enter reason for rejection (e.g. Invalid Email, Cheating):");
         if(reason === null) return; 
         
         try {
-            // 🚀 BRANDING UPDATE
             await updateDoc(doc(db, "earnx_withdrawals", docId), { status: "Rejected", reason: reason || "Server Rejected" });
             const userRef = doc(db, "earnx_users", userId);
             const userSnap = await getDoc(userRef);
@@ -956,7 +948,6 @@
                 const userData = userSnap.data();
                 const newBalance = (Number(userData.coins) || 0) + coinAmount;
                 let txs = Array.isArray(userData.transactions) ? userData.transactions : [];
-                // 🚀 BRANDING UPDATE
                 txs.unshift({ title: "Refund: " + (reason || "Withdrawal Rejected by Server"), amount: coinAmount, type: "earn", date: Date.now() });
                 if(txs.length > 50) txs.pop();
                 
@@ -968,7 +959,6 @@
         } catch(e) { window.showToast("Error processing reject", true); }
     }
 
-    // --- NEW FEATURE: REVERSE APPROVED WITHDRAWAL ---
     window.reverseReq = async (docId, userId, coinAmount) => {
         const reason = prompt("Enter reason for REVERSING this approved withdrawal:");
         if(reason === null) return; 
@@ -982,7 +972,6 @@
                 const userData = userSnap.data();
                 const newBalance = (Number(userData.coins) || 0) + coinAmount;
                 let txs = Array.isArray(userData.transactions) ? userData.transactions : [];
-                // 🚀 BRANDING UPDATE
                 txs.unshift({ title: "Refund (Reversed by Server): " + reason, amount: coinAmount, type: "earn", date: Date.now() });
                 if(txs.length > 50) txs.pop();
                 
@@ -994,7 +983,6 @@
         } catch(e) { window.showToast("Error processing reverse", true); }
     }
 
-    // --- UPGRADED FAKE ACCOUNT DETECTOR ---
     window.findFakeUsers = () => {
         if (!allUsers || allUsers.length === 0) {
             document.getElementById("fakeAlertBox").innerHTML = "<span style='color: var(--warning);'>⚠️ Please wait for user data to load first!</span>";
