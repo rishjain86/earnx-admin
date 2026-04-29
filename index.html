@@ -468,7 +468,7 @@
                 });
                 allWithdrawals.sort((a,b) => getSafeMs(b.createdAt) - getSafeMs(a.createdAt));
                 document.getElementById('stat-pending').innerText = pendingCount;
-                document.getElementById('stat-paid').innerText = `₹${(totalPaidCoins / 10000) * 100}`;
+                document.getElementById('stat-paid').innerText = `₹${(totalPaidCoins / 20000) * 100}`;
                 window.refreshActiveTab();
             });
         }
