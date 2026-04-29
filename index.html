@@ -457,22 +457,33 @@
             });
         }
 
-        if (!unsubWithdrawals) {
+                if (!unsubWithdrawals) {
             unsubWithdrawals = onSnapshot(collection(db, "earnx_withdrawals"), (snap) => {
                 allWithdrawals = [];
-                let pendingCount = 0; let totalPaidCoins = 0;
+                let pendingCount = 0; 
+                let totalPaidRupees = 0; // Ab hum direct Rupees count karenge
+                
                 snap.forEach(doc => {
-                    let data = doc.data(); data.docId = doc.id; allWithdrawals.push(data);
+                    let data = doc.data(); 
+                    data.docId = doc.id; 
+                    allWithdrawals.push(data);
+                    
                     if(data.status === "Pending") pendingCount++;
-                    if(data.status === "Approved") totalPaidCoins += data.coins;
+                    
+                    if(data.status === "Approved") {
+                        // Purani entry (10k) ko ₹100 aur nayi ko 20k=₹100 ke hisaab se calculation
+                        let amountInRs = data.coins === 10000 ? 100 : (data.coins / 20000) * 100;
+                        totalPaidRupees += amountInRs;
+                    }
                 });
+                
                 allWithdrawals.sort((a,b) => getSafeMs(b.createdAt) - getSafeMs(a.createdAt));
                 document.getElementById('stat-pending').innerText = pendingCount;
-                document.getElementById('stat-paid').innerText = `₹${(totalPaidCoins / 20000) * 100}`;
+                // Direct accurate rupees ko yahan print karwayenge
+                document.getElementById('stat-paid').innerText = `₹${totalPaidRupees}`; 
                 window.refreshActiveTab();
             });
         }
-
         try {
             const noticeSnap = await getDoc(doc(db, "earnx_settings", "app_notice"));
             if(noticeSnap.exists()) {
