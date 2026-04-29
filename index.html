@@ -594,7 +594,7 @@
                 <td data-label="Date & Time"><span style="font-size: 0.8rem; font-weight: 600; color: white;">${formatFullTime(w.createdAt)}</span></td>
                 <td data-label="User ID">...${w.userId.substring(0,8)}</td>
                 <td data-label="Target">${targetContact}</td>
-                <td data-label="Amount & Type">₹${((w.coins / 10000) * 100).toFixed(2)}<br>${payoutMethod}</td>
+                <td data-label="Amount & Type">₹${((w.coins / 20000) * 100).toFixed(2)}<br>${payoutMethod}</td>
                 <td data-label="Status"><span class="badge ${w.status === 'Approved' ? 'badge-approved' : (w.status === 'Rejected' ? 'badge-rejected' : 'badge-pending')}">${w.status === 'Rejected' ? 'Rejected by Server' : w.status}</span></td>
                 <td data-label="Action">${actionHtml}</td>
             `;
