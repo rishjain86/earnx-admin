@@ -1118,4 +1118,26 @@
                     foundFake = true;
                     let usersList = countObj[key].join('<br><br> 👉 ');
                     outputHTML += `
-                    <div style="background: var(--bg-dark); padding: 10px; border-left: 4px solid var(--danger); margin-bottom: 10px; border-
+                    <div style="background: var(--bg-dark); padding: 10px; border-left: 4px solid var(--danger); margin-bottom: 10px; border-radius: 4px;">
+                        <span style="color: var(--warning); font-size: 0.8rem; margin-bottom: 5px; display: block;"><i class="${icon}"></i> ${title}: ${key}</span>
+                        <div style="margin-left: 10px; padding-left: 10px; border-left: 1px dashed var(--card-border);">
+                            👉 ${usersList}
+                        </div>
+                    </div>`;
+                }
+            }
+        };
+
+        renderDuplicates(deviceCount, "Device ID", "fa-solid fa-mobile-screen");
+        renderDuplicates(fbCount, "Facebook ID", "fa-brands fa-facebook");
+        renderDuplicates(instaCount, "Instagram ID", "fa-brands fa-instagram");
+
+        if(!foundFake) {
+            outputHTML = "<p style='color: var(--primary); font-weight: bold;'><i class='fa-solid fa-circle-check'></i> All clean! No fake accounts detected.</p>";
+        }
+
+        document.getElementById("fakeAlertBox").innerHTML = outputHTML;
+    }
+</script>
+</body>
+</html>
