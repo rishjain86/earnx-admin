@@ -701,7 +701,7 @@
 
         // Sort by highest task count
         activeStats.sort((a,b) => b.count - a.count);
-        const topActive = activeStats.slice(0, 5000); // Show top 5000
+        const topActive = activeStats;
 
         if(topActive.length === 0) {
             tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;">No activity found in this period.</td></tr>`;
