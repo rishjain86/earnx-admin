@@ -701,7 +701,7 @@
 
         // Sort by highest task count
         activeStats.sort((a,b) => b.count - a.count);
-        const topActive = activeStats.slice(0, 50); // Show top 50
+        const topActive = activeStats.slice(0, 5000); // Show top 5000
 
         if(topActive.length === 0) {
             tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;">No activity found in this period.</td></tr>`;
@@ -807,7 +807,7 @@
         }
 
         refLeaders.sort((a,b) => b.totalRefs - a.totalRefs);
-        const topReferrers = refLeaders.slice(0, 50);
+        const topReferrers = refLeaders.slice(0, 5000);
 
         if(topReferrers.length === 0) {
             tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;">No referrals found yet.</td></tr>`;
@@ -862,7 +862,7 @@
             .filter(u => u.lifetimeCoins > 0);
 
         const sortedUsers = usersWithLifetime.sort((a,b) => b.lifetimeCoins - a.lifetimeCoins);
-        const topUsers = sortedUsers.slice(0, 50);
+        const topUsers = sortedUsers.slice(0, 5000);
 
         if(topUsers.length === 0) { tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;">Leaderboard empty.</td></tr>`; return; }
 
