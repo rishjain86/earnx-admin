@@ -993,7 +993,6 @@
             if(user) {
                 let txs = Array.isArray(user.transactions) ? user.transactions : [];
                 txs.unshift({ title: "Server Warning Sent", amount: 0, type: "spend", date: Date.now() });
-                if(txs.length > 50) txs.pop();
                 await updateDoc(doc(db, "earnx_users", currentOpenUserId), { transactions: txs });
                 window.logAdminAction("Personal Alert", `Sent to user ${user.profile?.name || currentOpenUserId}. Msg: "${alertMsg}"`);
             }
@@ -1025,8 +1024,7 @@
                 const newTx = { title: "Server Adjustment", amount: Math.abs(amount), type: txType, date: Date.now() };
 
                 txs.unshift(newTx);
-                if(txs.length > 50) txs.pop();
-                
+    
                 await updateDoc(userRef, { coins: newBalance, transactions: txs });
                 window.showToast("Balance Updated Successfully!");
                 window.logAdminAction("Balance Edit", `User balance changed by ${amount}. New total: ${newBalance} for ${userId}`);
@@ -1057,7 +1055,6 @@
                 const newBalance = (Number(userData.coins) || 0) + coinAmount;
                 let txs = Array.isArray(userData.transactions) ? userData.transactions : [];
                 txs.unshift({ title: "Refund: " + (reason || "Withdrawal Rejected by Server"), amount: coinAmount, type: "earn", date: Date.now() });
-                if(txs.length > 50) txs.pop();
                 
                 await updateDoc(userRef, { coins: newBalance, transactions: txs });
             }
@@ -1081,7 +1078,6 @@
                 const newBalance = (Number(userData.coins) || 0) + coinAmount;
                 let txs = Array.isArray(userData.transactions) ? userData.transactions : [];
                 txs.unshift({ title: "Refund (Reversed by Server): " + reason, amount: coinAmount, type: "earn", date: Date.now() });
-                if(txs.length > 50) txs.pop();
                 
                 await updateDoc(userRef, { coins: newBalance, transactions: txs });
             }
