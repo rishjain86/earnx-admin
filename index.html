@@ -164,7 +164,7 @@
             </div>
 
             <h3 style="margin-top: 10px; margin-bottom: 10px; font-size: 1.1rem; border-bottom: 1px solid var(--card-border); padding-bottom: 10px;">Full Activity Log</h3>
-            <div id="modal-tx-list" style="max-height: 500px; overflow-y: auto; margin-bottom: 10px; border: 1px solid var(--card-border); padding: 10px; border-radius: 8px; background: var(--bg-dark);"></div>
+            <div id="modal-tx-list" style="max-height: 400px; overflow-y: auto; margin-bottom: 10px; border: 1px solid var(--card-border); padding: 10px; border-radius: 8px; background: var(--bg-dark);"></div>
 
             <div class="admin-controls">
                 <button class="btn btn-warning" id="btn-alert" onclick="sendPersonalAlert()"><i class="fa-solid fa-triangle-exclamation"></i> Send Alert</button>
@@ -662,7 +662,6 @@
         });
     }
 
-    // 🚀 NEW FUNCTION: RENDER MOST ACTIVE USERS
     window.renderActiveUsers = () => {
         const tbody = document.getElementById('tbody-active-users');
         tbody.innerHTML = '';
@@ -670,14 +669,12 @@
         const now = Date.now();
         let timeLimit = 0;
 
-        // Determine timeframe
         if (filter === 'day') timeLimit = now - (24 * 60 * 60 * 1000);
         else if (filter === 'week') timeLimit = now - (7 * 24 * 60 * 60 * 1000);
         else if (filter === 'month') timeLimit = now - (30 * 24 * 60 * 60 * 1000);
 
         let activeStats = [];
 
-        // Count earning transactions within the timeframe
         allUsers.forEach(u => {
             if(u.isBlocked) return; 
             
@@ -699,9 +696,10 @@
             }
         });
 
-        // Sort by highest task count
         activeStats.sort((a,b) => b.count - a.count);
-        const topActive = activeStats;
+        
+        // LIMIT HATAA DI GAYI HAI (Ab yahan sabhi users dikhenge)
+        const topActive = activeStats; 
 
         if(topActive.length === 0) {
             tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;">No activity found in this period.</td></tr>`;
@@ -807,7 +805,9 @@
         }
 
         refLeaders.sort((a,b) => b.totalRefs - a.totalRefs);
-        const topReferrers = refLeaders;
+        
+        // LIMIT HATAA DI GAYI HAI
+        const topReferrers = refLeaders; 
 
         if(topReferrers.length === 0) {
             tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;">No referrals found yet.</td></tr>`;
@@ -862,7 +862,9 @@
             .filter(u => u.lifetimeCoins > 0);
 
         const sortedUsers = usersWithLifetime.sort((a,b) => b.lifetimeCoins - a.lifetimeCoins);
-        const topUsers = sortedUsers;
+        
+        // LIMIT HATAA DI GAYI HAI
+        const topUsers = sortedUsers; 
 
         if(topUsers.length === 0) { tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;">Leaderboard empty.</td></tr>`; return; }
 
@@ -993,6 +995,7 @@
             if(user) {
                 let txs = Array.isArray(user.transactions) ? user.transactions : [];
                 txs.unshift({ title: "Server Warning Sent", amount: 0, type: "spend", date: Date.now() });
+                // Limit removed for unlimited task view
                 await updateDoc(doc(db, "earnx_users", currentOpenUserId), { transactions: txs });
                 window.logAdminAction("Personal Alert", `Sent to user ${user.profile?.name || currentOpenUserId}. Msg: "${alertMsg}"`);
             }
@@ -1024,7 +1027,8 @@
                 const newTx = { title: "Server Adjustment", amount: Math.abs(amount), type: txType, date: Date.now() };
 
                 txs.unshift(newTx);
-    
+                // Limit removed for unlimited task view
+                
                 await updateDoc(userRef, { coins: newBalance, transactions: txs });
                 window.showToast("Balance Updated Successfully!");
                 window.logAdminAction("Balance Edit", `User balance changed by ${amount}. New total: ${newBalance} for ${userId}`);
@@ -1055,6 +1059,7 @@
                 const newBalance = (Number(userData.coins) || 0) + coinAmount;
                 let txs = Array.isArray(userData.transactions) ? userData.transactions : [];
                 txs.unshift({ title: "Refund: " + (reason || "Withdrawal Rejected by Server"), amount: coinAmount, type: "earn", date: Date.now() });
+                // Limit removed for unlimited task view
                 
                 await updateDoc(userRef, { coins: newBalance, transactions: txs });
             }
@@ -1078,6 +1083,7 @@
                 const newBalance = (Number(userData.coins) || 0) + coinAmount;
                 let txs = Array.isArray(userData.transactions) ? userData.transactions : [];
                 txs.unshift({ title: "Refund (Reversed by Server): " + reason, amount: coinAmount, type: "earn", date: Date.now() });
+                // Limit removed for unlimited task view
                 
                 await updateDoc(userRef, { coins: newBalance, transactions: txs });
             }
